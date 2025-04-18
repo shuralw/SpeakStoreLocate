@@ -1,0 +1,48 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35931.197 d17.13
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpeakStoreLocate.AppHost", "SpeakStoreLocate.AppHost\SpeakStoreLocate.AppHost.csproj", "{28F63318-85E6-4954-ABC7-F8F79A1F5347}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpeakStoreLocate.ServiceDefaults", "SpeakStoreLocate.ServiceDefaults\SpeakStoreLocate.ServiceDefaults.csproj", "{EDEC4539-F1FF-4BF8-A00A-5DE690B59391}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpeakStoreLocate.ApiService", "SpeakStoreLocate.ApiService\SpeakStoreLocate.ApiService.csproj", "{DB5126DC-7BAD-C4F5-5540-28F7DBE9CEF4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpeakStoreLocate.Web", "SpeakStoreLocate.Web\SpeakStoreLocate.Web.csproj", "{7A1C8A5D-389C-133B-E3CA-8CD5F86B25AF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpeakStoreLocate.Tests", "SpeakStoreLocate.Tests\SpeakStoreLocate.Tests.csproj", "{958FB8F6-2571-6119-E43A-7E14F8C0ABD1}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{28F63318-85E6-4954-ABC7-F8F79A1F5347}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{28F63318-85E6-4954-ABC7-F8F79A1F5347}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{28F63318-85E6-4954-ABC7-F8F79A1F5347}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{28F63318-85E6-4954-ABC7-F8F79A1F5347}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EDEC4539-F1FF-4BF8-A00A-5DE690B59391}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EDEC4539-F1FF-4BF8-A00A-5DE690B59391}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EDEC4539-F1FF-4BF8-A00A-5DE690B59391}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EDEC4539-F1FF-4BF8-A00A-5DE690B59391}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DB5126DC-7BAD-C4F5-5540-28F7DBE9CEF4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DB5126DC-7BAD-C4F5-5540-28F7DBE9CEF4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DB5126DC-7BAD-C4F5-5540-28F7DBE9CEF4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DB5126DC-7BAD-C4F5-5540-28F7DBE9CEF4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7A1C8A5D-389C-133B-E3CA-8CD5F86B25AF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7A1C8A5D-389C-133B-E3CA-8CD5F86B25AF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7A1C8A5D-389C-133B-E3CA-8CD5F86B25AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7A1C8A5D-389C-133B-E3CA-8CD5F86B25AF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{958FB8F6-2571-6119-E43A-7E14F8C0ABD1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{958FB8F6-2571-6119-E43A-7E14F8C0ABD1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{958FB8F6-2571-6119-E43A-7E14F8C0ABD1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{958FB8F6-2571-6119-E43A-7E14F8C0ABD1}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {51D26C5D-7F2E-4438-8B93-A06515D69E8F}
+	EndGlobalSection
+EndGlobal
