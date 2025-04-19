@@ -8,8 +8,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpeakStoreLocate.ServiceDef
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpeakStoreLocate.ApiService", "SpeakStoreLocate.ApiService\SpeakStoreLocate.ApiService.csproj", "{DB5126DC-7BAD-C4F5-5540-28F7DBE9CEF4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpeakStoreLocate.Web", "SpeakStoreLocate.Web\SpeakStoreLocate.Web.csproj", "{7A1C8A5D-389C-133B-E3CA-8CD5F86B25AF}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpeakStoreLocate.Tests", "SpeakStoreLocate.Tests\SpeakStoreLocate.Tests.csproj", "{958FB8F6-2571-6119-E43A-7E14F8C0ABD1}"
 EndProject
 Global
@@ -30,10 +28,6 @@ Global
 		{DB5126DC-7BAD-C4F5-5540-28F7DBE9CEF4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DB5126DC-7BAD-C4F5-5540-28F7DBE9CEF4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DB5126DC-7BAD-C4F5-5540-28F7DBE9CEF4}.Release|Any CPU.Build.0 = Release|Any CPU
-		{7A1C8A5D-389C-133B-E3CA-8CD5F86B25AF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{7A1C8A5D-389C-133B-E3CA-8CD5F86B25AF}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{7A1C8A5D-389C-133B-E3CA-8CD5F86B25AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{7A1C8A5D-389C-133B-E3CA-8CD5F86B25AF}.Release|Any CPU.Build.0 = Release|Any CPU
 		{958FB8F6-2571-6119-E43A-7E14F8C0ABD1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{958FB8F6-2571-6119-E43A-7E14F8C0ABD1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{958FB8F6-2571-6119-E43A-7E14F8C0ABD1}.Release|Any CPU.ActiveCfg = Release|Any CPU
