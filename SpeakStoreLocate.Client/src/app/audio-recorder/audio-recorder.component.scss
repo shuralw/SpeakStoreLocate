@@ -1,0 +1,25 @@
+.record-button {
+    padding: .5rem 1rem;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: .25rem;
+    cursor: pointer;
+  }
+  
+  .recording-indicator {
+    margin-top: .5rem;
+    font-weight: bold;
+  }
+  
+  .notification {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    padding: 1rem;
+    border-radius: .25rem;
+    color: white;
+    &.success { background-color: green; }
+    &.error   { background-color: red;   }
+  }
+  

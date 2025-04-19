@@ -11,7 +11,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SpeakStoreLocate.ApiService\SpeakStoreLocate.ApiService.csproj" />
-    <ProjectReference Include="..\SpeakStoreLocate.Web\SpeakStoreLocate.Web.csproj" />
   </ItemGroup>
 
   <ItemGroup>

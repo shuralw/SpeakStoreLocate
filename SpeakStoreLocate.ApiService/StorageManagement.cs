@@ -77,7 +77,7 @@ public class StorageController : ControllerBase
                 ""method"":   ""<GET|DELETE|POST|PUT>"",
                 ""count"":    <Integer>,
                 ""itemName"": ""<Artikelname>"",
-                ""location"": ""<Ort>""
+                ""location"": ""<Ort>"" (wenn es sich um eine Suche handelt lass den Ort leer)
               },
               …
             ]
@@ -112,9 +112,10 @@ public class StorageController : ControllerBase
             {
                 var storageItem = await FindStorageItemByName(cmd);
 
-                _logger.LogInformation("Das gesuchte Objekt befindet sich in {storageItemLocation}",
+                _logger.LogInformation("{itemName} befindet sich hier: {storageItemLocation}",
+                    cmd.ItemName,
                     storageItem.Location);
-                performedActions.Add($"Das gesuchte Objekt befindet sich in {storageItem.Location}");
+                performedActions.Add($"{cmd.ItemName} befindet sich hier: {storageItem.Location}");
             }
 
             if (cmd.Method == METHODS.UMLAGERN)
@@ -155,12 +156,18 @@ public class StorageController : ControllerBase
             }
         }
 
-        return Ok(string.Join("\n", performedActions));
+        _logger.LogDebug("Anzahl an Ergebnissen: {performedActions}", performedActions.Count().ToString());
+        string results = string.Join("\n", performedActions);
+        _logger.LogDebug("Ergebnisse: {results}", results);
+
+        return Ok(results);
     }
 
     private async Task<StorageItem> FindStorageItemByName(StorageCommand cmd)
     {
         var normalizedQuery = cmd.ItemName.NormalizeForSearch();
+        _logger.LogDebug("itemname: {itemname}", cmd.ItemName);
+        _logger.LogDebug("normalizedQuery: {normalizedQuery}", normalizedQuery);
         var conditions = new List<ScanCondition>
         {
             new ScanCondition("NormalizedName", ScanOperator.Contains, normalizedQuery)

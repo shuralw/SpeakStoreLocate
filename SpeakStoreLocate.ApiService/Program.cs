@@ -3,6 +3,7 @@ using Amazon.S3;
 using Amazon.TranscribeService;
 using Microsoft.Extensions.Options;
 using OpenAI;
+using Serilog;
 using SpeakStoreLocate.ServiceDefaults;
 
 namespace SpeakStoreLocate.ApiService;
@@ -13,8 +14,40 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        builder.Configuration
-            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+        Log.Logger = new LoggerConfiguration()
+            .ReadFrom.Configuration(builder.Configuration)
+            .Enrich.FromLogContext()
+            .WriteTo.Console()
+            .CreateBootstrapLogger();
+
+        builder.Host.UseSerilog((ctx, services, cfg) =>
+            cfg.ReadFrom.Configuration(ctx.Configuration)
+                .ReadFrom.Services(services)
+                .Enrich.FromLogContext()
+                .WriteTo.Console()
+                .WriteTo.File("./logs/general.log", rollingInterval: RollingInterval.Day));
+
+        builder.Services.AddSerilog((services, lc) => lc
+            .ReadFrom.Configuration(builder.Configuration)
+            .ReadFrom.Services(services)
+            .Enrich.FromLogContext()
+            .WriteTo.Console()
+            .WriteTo.File("./logs/general.log"));
+
+        var corsOrigins = builder.Configuration
+            .GetSection("Cors:AllowedOrigins")
+            .Get<string[]>() ?? Array.Empty<string>();
+
+        builder.Services.AddCors(options =>
+        {
+            options.AddPolicy("DefaultCorsPolicy", policy =>
+            {
+                policy.WithOrigins(corsOrigins)
+                    .AllowAnyHeader()
+                    .AllowAnyMethod();
+            });
+        });
+
         builder.AddServiceDefaults();
 
         builder.Services.Configure<OpenAIOptions>(builder.Configuration.GetSection("OpenAI"));
@@ -27,7 +60,7 @@ public class Program
         builder.Services.AddSingleton<AmazonTranscribeServiceClient>(sp =>
             new AmazonTranscribeServiceClient(awsCredentials, awsRegion));
 
-        
+
 // 2. OpenAIClient registrieren
         builder.Services.AddSingleton(sp =>
         {
@@ -49,6 +82,8 @@ public class Program
 
         var app = builder.Build();
 
+        app.UseSerilogRequestLogging();
+
         app.MapDefaultEndpoints();
 
         // Configure the HTTP request pipeline.
@@ -57,7 +92,8 @@ public class Program
             app.UseSwagger();
             app.UseSwaggerUI();
         }
-
+        
+        app.UseCors("DefaultCorsPolicy");
         app.UseHttpsRedirection();
 
         app.UseAuthorization();

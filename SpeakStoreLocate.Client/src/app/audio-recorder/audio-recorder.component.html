@@ -1,1 +1,20 @@
 <p>audio-recorder works!</p>
+
+<button class="record-button"
+        (pointerdown)="startRecording()"
+        (pointerup)="stopRecording()"
+        (pointerleave)="stopRecording()"
+        (touchstart)="startRecording()"
+        (touchend)="stopRecording()">
+  Halte, um aufzunehmen
+</button>
+
+<div *ngIf="isRecording" class="recording-indicator">
+  🔴 Aufnahme läuft…
+</div>
+
+<div *ngIf="showPopup"
+     class="notification"
+     [ngClass]="{ 'success': isSuccess, 'error': !isSuccess }">
+  {{ popupMessage }}
+</div>
