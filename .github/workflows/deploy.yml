@@ -34,7 +34,7 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
-          docker build -t $ECR_REPOSITORY:$IMAGE_TAG ./SpeakStoreLocate.ApiService
+          docker build -f ./SpeakStoreLocate.ApiService/Dockerfile -t $ECR_REPOSITORY:$IMAGE_TAG .
           docker tag $ECR_REPOSITORY:$IMAGE_TAG \
             116981762814.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
           docker push \
