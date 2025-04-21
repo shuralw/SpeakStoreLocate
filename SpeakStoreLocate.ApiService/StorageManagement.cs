@@ -61,30 +61,58 @@ public class StorageController : ControllerBase
 
         // Bau den Prompt
         var systemPrompt = @"
-            Du bist ein Parser, der aus einem Transkript alle Lager‑Aktionen extrahiert.
-            Bestimme für jede Aktion exakt eine der Methoden:
-              • GET    – wenn der User nach einem Artikel fragt (z.B. 'wo ist ...', 'suche ...').
-              • DELETE – wenn der User etwas entfernt oder entnimmt (z.B. 'nehme ... aus ...', 'entferne ...').
-              • POST   – wenn der User einen Artikel neu ablegt oder zusammen mit anderen in einen Ort legt 
-                         (z.B. 'lege ... in ...', 'einlagern', 'ablegen', 'in ... tun', 'zusammen mit').
-              • PUT    – wenn der User einen Artikel von einem Ort in einen anderen verschiebt 
-                         (explizit Ziel und Ursprung genannt und es sich um eine Verschiebung handelt, 
-                         z.B. 'verschiebe ... von ... nach ...', 'umlagern').
+            Du bist ein Parser, der aus einem deutschsprachigen Transkript alle Lager‑Aktionen extrahiert.  
+            Erzeuge **striktes** JSON (keine Freitext‑Antwort!), und zwar ein Array von Objekten mit genau diesen vier Feldern:
 
-            Gib die Aktionen als JSON‑Array zurück mit Objekten der Form:
-            [
-              {
-                ""method"":   ""<GET|DELETE|POST|PUT>"",
-                ""count"":    <Integer>,
-                ""itemName"": ""<Artikelname>"",
-                ""location"": ""<Ort>"" (wenn es sich um eine Suche handelt lass den Ort leer)
-              },
-              …
-            ]
-            ";
+            • method        – eine der Zeichenketten ""GET"", ""DELETE"", ""POST"" oder ""PUT""  
+            • count         – eine Ganzzahl (1,2,3…)  
+            • itemName      – der exakte Artikelname (inkl. Groß‑/Kleinschreibung wie im Transkript)  
+            • source        – die Quelllokation (optional, nur bei PUT mandatory) 
+            • destination   – die Ziellokation (optional - bleibt leer bei GET)  
+
+            **Regeln für die Methodenwahl:**  
+            1. **PUT**  nur wenn **im selben Satz**  
+                - eine **Quelllokation** (z.B. „von Regal A“)  
+                - **und** eine **Ziellokation** (z.B. „nach Regal B“) explizit genannt werden.  
+            2. **DELETE** wenn der User etwas „entnimmt“, „ausschüttet“, „herausnimmt“ o. Ä.  
+            3. **GET**    wenn der User nach dem Ort fragt („wo ist…“, „suche…“).  
+            4. **POST**  in **allen anderen Fällen**, also  
+                - „einlagern“, „ablegen“, „in … tun“, „hängen“, „befestigen“, „stellen“,  
+                - oder wenn nur eine Lokation angegeben ist ohne Quelle.  
+
+            **Weiteres Optimierungspotenzial:**  
+                - Füge bei PUT‑Befehlen das Feld `""source""` hinzu, um die Quell‑Lokation zu speichern.  
+                - Gib immer `""count"": 1`, wenn keine Zahl genannt wird.  
+                - Ersetze ausgeschriebene Zahlen („drei“) durch Ziffern (3).  
+                - Normalisiere Leer‑ und Sonderzeichen (Trim, keine führenden/trailenden Leerzeichen).  
+                - Wenn ein Satz kein valides Kommando enthält, ignoriere ihn schlicht.  
+                - Falls du offensichtliche Rechtschreibfehler erkennst, die der Transkriptor erzeugt haben könnte, korrigiere diese. Das kommt aber relativ selten vor.
+                - Filler‑Wörter: Entferne Artikel (der, die, das) und Füllwörter, aber nur soweit, dass der eigentliche Artikelname klar bleibt.    
+
+            **Beispiel-Ausgabe** für deinen Text:
+                >„Und das Fahrrad wird an der Wand aufgehangen.“
+                [
+                    {
+                        ""method"":   ""POST"",
+                        ""count"":    1,
+                        ""itemName"": ""Fahrrad"",
+                        ""destination"": ""Wand""
+                    }
+                ]
+            Und für
+                >„Verschiebe die Lampe von Regal A nach Regal B.“
+                [
+                    {
+                        ""method"":   ""PUT"",
+                        ""count"":    1,
+                        ""itemName"": ""Lampe"",
+                        ""source"":   ""Regal A"",
+                        ""destination"": ""Regal B""
+                    }
+                ]";
 
 
-        _logger.LogInformation("Transkript generiert: {transcriptedText}", transcriptedText);
+        _logger.LogInformation("Transkript generiert:{transcriptedText}", transcriptedText);
 
         var commands = await InterpretGeschwafelToStructuredCommands(systemPrompt, transcriptedText);
 
@@ -95,24 +123,24 @@ public class StorageController : ControllerBase
         {
             if (cmd.Method == METHODS.ENTNAHME)
             {
-                var storageItem = await FindStorageItemByName(cmd);
+                var storageItem = await FindStorageItemByNameAndLocation(cmd);
 
                 await _dbContext.DeleteAsync(storageItem);
 
                 _logger.LogInformation(
-                    "Das Objekt {cmdItemName} wurde aus dem Lagerort {cmdLocation} erfolgreich entfernt",
+                    "Das Objekt {cmdItemName} wurde aus dem Lagerort {cmdDestination} erfolgreich entfernt",
                     cmd.ItemName,
-                    cmd.Location);
+                    cmd.Destination);
 
                 performedActions.Add(
-                    $"Das Objekt {cmd.ItemName} wurde aus dem Lagerort {cmd.Location} erfolgreich entfernt");
+                    $"Das Objekt {cmd.ItemName} wurde aus dem Lagerort {cmd.Destination} erfolgreich entfernt");
             }
 
             if (cmd.Method == METHODS.SUCHE)
             {
-                var storageItem = await FindStorageItemByName(cmd);
+                var storageItem = await FindStorageItemByNameAndLocation(cmd);
 
-                _logger.LogInformation("{itemName} befindet sich hier: {storageItemLocation}",
+                _logger.LogInformation("{itemName} befindet sich hier: {storageItemDestination}",
                     cmd.ItemName,
                     storageItem.Location);
                 performedActions.Add($"{cmd.ItemName} befindet sich hier: {storageItem.Location}");
@@ -120,20 +148,20 @@ public class StorageController : ControllerBase
 
             if (cmd.Method == METHODS.UMLAGERN)
             {
-                var storageItem = await FindStorageItemByName(cmd);
+                var storageItem = await FindStorageItemByNameAndLocation(cmd);
 
-                storageItem.Location = cmd.Location;
+                storageItem.Location = cmd.Destination;
 
                 await _dbContext.SaveAsync(storageItem);
 
                 _logger.LogInformation(
-                    "Umlagerung: {storageItemName} wurde von {storageItemLocation} nach {cmdLocation} umgelagert",
+                    "Umlagerung: {storageItemName} wurde von {storageItemDestination} nach {cmdDestination} umgelagert",
                     storageItem.Name,
                     storageItem.Location,
-                    cmd.Location);
+                    cmd.Destination);
 
                 performedActions.Add(
-                    $"Umlagerung: {storageItem.Name} wurde von {storageItem.Location} nach {cmd.Location} umgelagert");
+                    $"Umlagerung: {storageItem.Name} wurde von {storageItem.Location} nach {cmd.Destination} umgelagert");
             }
 
             if (cmd.Method == METHODS.EINLAGERN)
@@ -142,13 +170,13 @@ public class StorageController : ControllerBase
                 {
                     Id = Guid.NewGuid().ToString(),
                     Name = cmd.ItemName,
-                    Location = cmd.Location,
+                    Location = cmd.Destination,
                     NormalizedName = cmd.ItemName.NormalizeForSearch()
                 };
 
                 await _dbContext.SaveAsync(storageItem);
 
-                _logger.LogInformation("Einlagerung: {storageItemName} wurde in {storageItemLocation} eingelagert",
+                _logger.LogInformation("Einlagerung: {storageItemName} wurde in {storageItemDestination} eingelagert",
                     storageItem.Name,
                     storageItem.Location);
 
@@ -163,10 +191,11 @@ public class StorageController : ControllerBase
         return Ok(results);
     }
 
-    private async Task<StorageItem> FindStorageItemByName(StorageCommand cmd)
+    private async Task<StorageItem> FindStorageItemByNameAndLocation(StorageCommand cmd)
     {
         var normalizedQuery = cmd.ItemName.NormalizeForSearch();
         _logger.LogDebug("itemname: {itemname}", cmd.ItemName);
+        _logger.LogDebug("itemname: {itemname}", cmd.Destination);
         _logger.LogDebug("normalizedQuery: {normalizedQuery}", normalizedQuery);
         var conditions = new List<ScanCondition>
         {
@@ -283,7 +312,7 @@ public class StorageController : ControllerBase
 
         [JsonPropertyName("itemName")] public string ItemName { get; set; }
 
-        [JsonPropertyName("location")] public string Location { get; set; }
+        [JsonPropertyName("destination")] public string Destination { get; set; }
     }
 }
 
@@ -305,7 +334,6 @@ public class StorageItem
 {
     [DynamoDBHashKey] public string Id { get; set; }
     [DynamoDBProperty] public string Name { get; set; }
-
     [DynamoDBProperty] public string NormalizedName { get; set; }
     [DynamoDBProperty] public string Location { get; set; }
 }
