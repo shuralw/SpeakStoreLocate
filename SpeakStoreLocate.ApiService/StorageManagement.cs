@@ -54,6 +54,15 @@ public class StorageController : ControllerBase
         _transcribeClient = new AmazonTranscribeServiceClient(awsCredentials, transcribeConfig);
     }
 
+    [HttpGet]
+    public async Task<IEnumerable<StorageItem>> GetItemsAsync()
+    {
+        var conditions = new List<ScanCondition>();
+        var results = await _dbContext.ScanAsync<StorageItem>(conditions).GetRemainingAsync();
+
+        return results;
+    }
+
     [HttpPost("upload-audio")]
     public async Task<IActionResult> UploadAudio([FromForm] AudioUploadRequest request)
     {
