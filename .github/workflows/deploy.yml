@@ -44,7 +44,5 @@ jobs:
         run: |
           aws apprunner update-service \
             --service-arn ${{ secrets.APP_RUNNER_SERVICE_ARN }} \
-            --source-configuration ImageRepository='{
-              "ImageIdentifier":"116981762814.dkr.ecr.'$AWS_REGION'.amazonaws.com/'$ECR_REPOSITORY':'$IMAGE_TAG'",
-              "ImageRepositoryType":"ECR"
-            }'
+            --source-configuration ImageRepository="{ImageIdentifier=116981762814.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG,ImageRepositoryType=ECR}"
+
