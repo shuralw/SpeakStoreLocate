@@ -48,7 +48,7 @@ export class AudioRecorderComponent {
     const form = new FormData();
     form.append('audioFile', blob, 'recording.webm');
 
-    this.http.post('http://localhost:5471/api/storage/upload-audio', form, { responseType: 'text' })
+    this.http.post('https://mkxrivn8wy.eu-central-1.awsapprunner.com/api/storage/upload-audio', form, { responseType: 'text' })
       .subscribe({
         next: () => this.showResult(true, 'Erfolgreich gespeichert!'),
         error: () => this.showResult(false, 'Fehler beim Speichern!')
