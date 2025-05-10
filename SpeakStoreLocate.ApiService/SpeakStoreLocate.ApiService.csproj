@@ -15,6 +15,7 @@
     <PackageReference Include="AWSSDK.DynamoDBv2" Version="3.7.405.35" />
     <PackageReference Include="AWSSDK.S3" Version="3.7.415.13" />
     <PackageReference Include="AWSSDK.TranscribeService" Version="3.7.403.8" />
+    <PackageReference Include="Deepgram" Version="6.0.0" />
     <PackageReference Include="Microsoft.Azure.Cosmos" Version="3.47.2" />
     <PackageReference Include="Microsoft.CognitiveServices.Speech" Version="1.42.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Cosmos" Version="9.0.2" />

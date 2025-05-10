@@ -55,7 +55,7 @@ public class Program
         // var awsCredentials = new Amazon.Runtime.BasicAWSCredentials(awsOptions["AccessKey"], awsOptions["SecretKey"]);
         var awsRegion = Amazon.RegionEndpoint.EUCentral1;
         var awsCredentials =
-            new Amazon.Runtime.BasicAWSCredentials("AKIARWPFIBL7FT3N6S33", "2qDDZ+zEXZvVdX4VVx0sKv1eByjp6uNBMVkv6SxG");
+            new Amazon.Runtime.BasicAWSCredentials("***", "***");
         builder.Services.AddSingleton<AmazonS3Client>(sp => new AmazonS3Client(awsCredentials, awsRegion));
         builder.Services.AddSingleton<AmazonTranscribeServiceClient>(sp =>
             new AmazonTranscribeServiceClient(awsCredentials, awsRegion));

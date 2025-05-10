@@ -11,6 +11,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using OpenAI;
 using OpenAI.Chat;
+using Deepgram;
+using Deepgram.Clients.Interfaces.v1;
+using Deepgram.Models.PreRecorded.v1;
 
 namespace SpeakStoreLocate.ApiService;
 
@@ -24,6 +27,7 @@ public class StorageController : ControllerBase
     private readonly AmazonS3Client _s3Client;
     private readonly ChatClient chatClient;
     private readonly ILogger<StorageController> _logger;
+    private readonly IListenRESTClient deepgramClient;
     private const string BucketName = "speech-storage-bucket";
 
     public StorageController(IConfiguration configuration, OpenAIClient openAiClient,
@@ -52,6 +56,9 @@ public class StorageController : ControllerBase
 
         var transcribeConfig = new AmazonTranscribeServiceConfig { RegionEndpoint = awsRegion };
         _transcribeClient = new AmazonTranscribeServiceClient(awsCredentials, transcribeConfig);
+
+        // Set "DEEPGRAM_API_KEY" environment variable to your Deepgram API Key
+        this.deepgramClient = ClientFactory.CreateListenRESTClient();
     }
 
     [HttpGet]
@@ -256,41 +263,28 @@ public class StorageController : ControllerBase
 
         var audioFileUri = $"s3://{BucketName}/{request.AudioFile.FileName}";
 
-        // 1) Transkriptionsjob starten
-        var startReq = new StartTranscriptionJobRequest
-        {
-            TranscriptionJobName = "StorageSpeechJob" + Guid.NewGuid(),
-            Media = new Media { MediaFileUri = audioFileUri },
-            MediaFormat = MediaFormat.Mp3,
-            LanguageCode = LanguageCode.DeDE
-        };
-        var startResp = await _transcribeClient.StartTranscriptionJobAsync(startReq);
-        var jobName = startResp.TranscriptionJob.TranscriptionJobName;
+        var response = await deepgramClient.TranscribeUrl(
+            new UrlSource(audioFileUri),
+            new PreRecordedSchema()
+            {
+                Model = "nova-3",
+                Punctuate = true,
+                Language = "de",
+            });
 
-        // 2) Polling bis COMPLETED
-        GetTranscriptionJobResponse jobResp;
-        do
-        {
-            await Task.Delay(5000);
-            jobResp = await _transcribeClient.GetTranscriptionJobAsync(
-                new GetTranscriptionJobRequest { TranscriptionJobName = jobName });
-        } while (jobResp.TranscriptionJob.TranscriptionJobStatus
-                 == TranscriptionJobStatus.IN_PROGRESS);
+        // 1. Für jeden Kanal die beste Alternative herausholen
+        var bestTranscriptionPerChannel = response
+            .Results
+            .Channels
+            .Select(channel =>
+                channel.Alternatives
+                    .OrderByDescending(alt => alt.Confidence)
+                    .First()
+                    .Transcript
+            );
 
-        if (jobResp.TranscriptionJob.TranscriptionJobStatus != TranscriptionJobStatus.COMPLETED)
-            throw new Exception(
-                $"Transkriptionsjob fehlgeschlagen. (Job {jobResp.TranscriptionJob.TranscriptionJobName})");
-
-        // 3) JSON abrufen und deserialisieren
-        var transcriptUrl = jobResp.TranscriptionJob.Transcript.TranscriptFileUri;
-        using var http = new HttpClient();
-        var json = await http.GetStringAsync(transcriptUrl);
-        var transcriptionResult = JsonSerializer.Deserialize<TranscriptionResponse>(json);
-        var transcriptText = transcriptionResult
-                                 .Results
-                                 .Transcripts[0]
-                                 .Text // statt .Text
-                             ?? throw new Exception("Kein Transcript.");
+        // 2. Alle Kanal-Transkripte zu einem Gesamtstring verbinden
+        string transcriptText = string.Join(" ", bestTranscriptionPerChannel);
 
 
         return transcriptText;
