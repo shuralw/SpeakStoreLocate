@@ -4,6 +4,7 @@ using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.DataModel;
 using Amazon.DynamoDBv2.DocumentModel;
 using Amazon.S3;
+using Amazon.S3.Model;
 using Amazon.S3.Transfer;
 using Amazon.TranscribeService;
 using Amazon.TranscribeService.Model;
@@ -253,18 +254,26 @@ public class StorageController : ControllerBase
 
     private async Task<string> TranscriptAudioAsync(AudioUploadRequest request)
     {
+        // 1) Datei in S3 hochladen
         var fileTransferUtility = new TransferUtility(_s3Client);
-        using (var memoryStream = new MemoryStream())
+        using (var ms = new MemoryStream())
         {
-            await request.AudioFile.CopyToAsync(memoryStream);
-            memoryStream.Position = 0;
-            await fileTransferUtility.UploadAsync(memoryStream, BucketName, request.AudioFile.FileName);
+            await request.AudioFile.CopyToAsync(ms);
+            ms.Position = 0;
+            await fileTransferUtility.UploadAsync(ms, BucketName, request.AudioFile.FileName);
         }
 
-        var audioFileUri = $"s3://{BucketName}/{request.AudioFile.FileName}";
+        // 2) PreSigned URL erstellen (5 Minuten gültig)
+        var presignRequest = new GetPreSignedUrlRequest
+        {
+            BucketName = BucketName,
+            Key = request.AudioFile.FileName,
+            Expires = DateTime.UtcNow.AddMinutes(5)
+        };
+        string presignedUrl = _s3Client.GetPreSignedURL(presignRequest);
 
         var response = await deepgramClient.TranscribeUrl(
-            new UrlSource(audioFileUri),
+            new UrlSource(presignedUrl),
             new PreRecordedSchema()
             {
                 Model = "nova-3",
