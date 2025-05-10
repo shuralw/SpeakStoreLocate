@@ -1,25 +1,66 @@
 .record-button {
-    padding: .5rem 1rem;
-    background-color: #007bff;
-    color: white;
+  padding: 0.5rem 1rem;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+.recording-indicator {
+  margin-top: 0.5rem;
+  font-weight: bold;
+}
+
+.notification {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  padding: 1rem;
+  border-radius: 0.25rem;
+  color: white;
+  &.success {
+    background-color: green;
+  }
+  &.error {
+    background-color: red;
+  }
+}
+
+.page-layout {
+  margin-top: 48px;
+  display: grid;
+  grid-template-columns: auto;
+  grid-template-rows: auto auto;
+  grid-template-areas:
+    "record-button"
+    "table-of-storageitems";
+  grid-gap: 24px;
+}
+
+.table-of-storageitems {
+  grid-area: table-of-storageitems;
+  width: 80vw;
+  display: flex;
+  justify-self: center;
+}
+
+/* styles.css oder component.css */
+.icon-button {
+  grid-area: record-button;
+  display: flex;
+  justify-content: center;
+
+  button {
+    background: none;
     border: none;
-    border-radius: .25rem;
+    padding: 0;
     cursor: pointer;
+    color: Tomato; /* Icon-Farbe */
+    margin: auto;
   }
-  
-  .recording-indicator {
-    margin-top: .5rem;
-    font-weight: bold;
+
+  .icon-button:focus {
+    outline: 2px solid #ff6347; /* sichtbarer Focus-Ring */
   }
-  
-  .notification {
-    position: fixed;
-    top: 1rem;
-    right: 1rem;
-    padding: 1rem;
-    border-radius: .25rem;
-    color: white;
-    &.success { background-color: green; }
-    &.error   { background-color: red;   }
-  }
-  
+}

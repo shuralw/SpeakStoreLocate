@@ -1,20 +1,38 @@
-<p>audio-recorder works!</p>
+<div class="page-layout">
+  <div class="icon-button">
+    <button type="button" (pointerdown)="onPointerDown($event)" (pointerup)="onPointerUp($event)"
+      (pointercancel)="onPointerCancel($event)">
+      <i class="fa-solid fa-record-vinyl fa-10x"></i>
+    </button>
+    <div *ngIf="isRecording" class="recording-indicator">
+      🔴 Aufnahme läuft…
+    </div>
+  </div>
 
-<button class="record-button"
-        (pointerdown)="startRecording()"
-        (pointerup)="stopRecording()"
-        (pointerleave)="stopRecording()"
-        (touchstart)="startRecording()"
-        (touchend)="stopRecording()">
-  Halte, um aufzunehmen
-</button>
+  <div class="table-of-storageitems">
+    <table mat-table [dataSource]="dataSource" class="mat-elevation-z8">
 
-<div *ngIf="isRecording" class="recording-indicator">
-  🔴 Aufnahme läuft…
+      <!--- Note that these columns can be defined in any order.
+        The actual rendered columns are set as a property on the row definition" -->
+
+      <!-- Position Column -->
+      <ng-container matColumnDef="location">
+        <th mat-header-cell *matHeaderCellDef> Ort </th>
+        <td mat-cell *matCellDef="let element"> {{element.location}} </td>
+      </ng-container>
+
+      <!-- Name Column -->
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef> Name </th>
+        <td mat-cell *matCellDef="let element"> {{element.name}} </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    </table>
+  </div>
+
 </div>
-
-<div *ngIf="showPopup"
-     class="notification"
-     [ngClass]="{ 'success': isSuccess, 'error': !isSuccess }">
+<div *ngIf="showPopup" class="notification" [ngClass]="{ 'success': isSuccess, 'error': !isSuccess }">
   {{ popupMessage }}
 </div>
