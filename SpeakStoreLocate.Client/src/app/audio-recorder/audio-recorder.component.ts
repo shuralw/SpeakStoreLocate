@@ -1,16 +1,11 @@
-import { HttpClient } from '@angular/common/http';
 import { Component, NgZone, OnInit } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
 export interface PeriodicElement {
-  name: string;
   location: string;
+  name: string;
 }
-
-const ELEMENT_DATA: PeriodicElement[] = [
-  { location: 'Karton A', name: 'Diddle Notizbuch' },
-  { location: 'Karton B', name: 'xD' },
-];
 
 @Component({
   selector: 'app-audio-recorder',
@@ -20,31 +15,32 @@ const ELEMENT_DATA: PeriodicElement[] = [
 export class AudioRecorderComponent implements OnInit {
 
   private readonly API_BASE = 'https://mkxrivn8wy.eu-central-1.awsapprunner.com/api/storage';
+  // private readonly API_BASE = 'http://localhost:5471/api/storage';
   dataSource: PeriodicElement[] = [];
+  displayedColumns = ['location', 'name'];
+
+  isRecording = false;
+  showPopup = false;
   isSuccess = false;
   popupMessage = '';
-  showPopup = false;
-  displayedColumns: string[] = ['location', 'name'];
-  isRecording = false;
 
-  private mediaRecorder!: MediaRecorder;
+  private mediaRecorder?: MediaRecorder;
   private audioChunks: BlobPart[] = [];
-  private stream!: MediaStream;
+  private stream?: MediaStream;
 
-  constructor(private http: HttpClient, private zone: NgZone) {
-  }
+  constructor(private http: HttpClient, private zone: NgZone) {}
 
   async ngOnInit() {
     this.dataSource = await this.getTableItems();
   }
 
-  async onPointerDown(evt: PointerEvent) {
+  async onPointerDown(evt: PointerEvent, btn: HTMLElement) {
     evt.preventDefault();
-    if (!this.stream) {
-      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    }
-    // Statt ViewChild: currentTarget ist hier das Button-Element
-    const btn = evt.currentTarget as HTMLElement;
+
+    // immer frisch holen, um leere Blobs zu vermeiden
+    this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    // Pointer Capture auf den Button
     btn.setPointerCapture(evt.pointerId);
 
     this.audioChunks = [];
@@ -56,19 +52,22 @@ export class AudioRecorderComponent implements OnInit {
     this.zone.run(() => this.isRecording = true);
   }
 
-  onPointerUp(evt: PointerEvent) {
-    const btn = evt.currentTarget as HTMLElement;
+  onPointerUp(evt: PointerEvent, btn: HTMLElement) {
+    // nur wenn wir aufnehmen
+    if (!this.mediaRecorder || this.mediaRecorder.state !== 'recording') {
+      return;
+    }
+
+    // Pointer Capture lösen
     btn.releasePointerCapture(evt.pointerId);
 
     this.mediaRecorder.stop();
     this.zone.run(() => this.isRecording = false);
   }
 
-  onPointerCancel(evt: PointerEvent) {
-    const btn = evt.currentTarget as HTMLElement;
-    btn.releasePointerCapture(evt.pointerId);
-
+  onPointerCancel(evt: PointerEvent, btn: HTMLElement) {
     if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+      btn.releasePointerCapture(evt.pointerId);
       this.mediaRecorder.stop();
     }
     this.audioChunks = [];
@@ -76,14 +75,21 @@ export class AudioRecorderComponent implements OnInit {
   }
 
   private async onRecordingStop() {
+    // Blob bauen
     const blob = new Blob(this.audioChunks, { type: 'audio/webm' });
-    this.stream.getTracks().forEach(t => t.stop());
+
+    // Mic freigeben
+    this.stream?.getTracks().forEach(t => t.stop());
+    this.stream = undefined;
+
+    // Debug: console.log('Blob size:', blob.size);
     await this.uploadAudio(blob);
   }
 
   private async uploadAudio(blob: Blob) {
     const form = new FormData();
     form.append('audioFile', blob, 'recording.webm');
+
     try {
       await firstValueFrom(
         this.http.post(`${this.API_BASE}/upload-audio`, form, { responseType: 'text' })
@@ -104,9 +110,9 @@ export class AudioRecorderComponent implements OnInit {
     setTimeout(() => this.zone.run(() => this.showPopup = false), 5000);
   }
 
-  private async getTableItems(): Promise<any[]> {
-    return await firstValueFrom(
-      this.http.get<any[]>(`${this.API_BASE}`)
+  private async getTableItems(): Promise<PeriodicElement[]> {
+    return firstValueFrom(
+      this.http.get<PeriodicElement[]>(`${this.API_BASE}`)
     );
   }
 }

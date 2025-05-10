@@ -1,9 +1,10 @@
 <div class="page-layout">
   <div class="icon-button">
-    <button type="button" (pointerdown)="onPointerDown($event)" (pointerup)="onPointerUp($event)"
-      (pointercancel)="onPointerCancel($event)">
+    <button #recordBtn type="button" (pointerdown)="onPointerDown($event, recordBtn)"
+      (pointerup)="onPointerUp($event, recordBtn)" (pointercancel)="onPointerCancel($event, recordBtn)">
       <i class="fa-solid fa-record-vinyl fa-10x"></i>
     </button>
+
     <div *ngIf="isRecording" class="recording-indicator">
       🔴 Aufnahme läuft…
     </div>
