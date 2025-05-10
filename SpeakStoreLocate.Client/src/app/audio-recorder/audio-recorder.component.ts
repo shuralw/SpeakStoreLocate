@@ -83,23 +83,33 @@ export class AudioRecorderComponent implements OnInit {
     this.stream = undefined;
 
     // Debug: console.log('Blob size:', blob.size);
-    await this.uploadAudio(blob);
+    let result = await this.uploadAudio(blob);
   }
 
-  private async uploadAudio(blob: Blob) {
+  private async uploadAudio(blob: Blob): Promise<void> {
     const form = new FormData();
     form.append('audioFile', blob, 'recording.webm');
-
+  
     try {
-      await firstValueFrom(
-        this.http.post(`${this.API_BASE}/upload-audio`, form, { responseType: 'text' })
+      // Wir erwarten jetzt ein JSON-Array von Strings vom Server
+      const results = await firstValueFrom(
+        this.http.post<string[]>(`${this.API_BASE}/upload-audio`, form)
       );
-      this.showResult(true, 'Erfolgreich gespeichert!');
+  
+      // Für jedes Resultat eine Meldung anzeigen
+      for (const res of results) {
+        this.showResult(true, `Erfolgreich gespeichert: ${res}`);
+        // Warten bis das Popup wieder verschwindet, bevor wir das nächste anzeigen
+        await new Promise(resolve => setTimeout(resolve, 5500));
+      }
+  
+      // Tabelle anschließend einmalig aktualisieren
       this.dataSource = await this.getTableItems();
     } catch {
       this.showResult(false, 'Fehler beim Speichern!');
     }
   }
+  
 
   private showResult(success: boolean, message: string) {
     this.zone.run(() => {

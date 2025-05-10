@@ -92,7 +92,7 @@ public class StorageController : ControllerBase
                 - eine **Quelllokation** (z.B. „von Regal A“)  
                 - **und** eine **Ziellokation** (z.B. „nach Regal B“) explizit genannt werden.  
             2. **DELETE** wenn der User etwas „entnimmt“, „ausschüttet“, „herausnimmt“ o. Ä.  
-            3. **GET**    wenn der User nach dem Ort fragt („wo ist…“, „suche…“).  
+            3. **GET**    wenn der User nach dem Ort fragt („wo ist…“, „suche…“).    
             4. **POST**  in **allen anderen Fällen**, also  
                 - „einlagern“, „ablegen“, „in … tun“, „hängen“, „befestigen“, „stellen“,  
                 - oder wenn nur eine Lokation angegeben ist ohne Quelle.  
@@ -103,6 +103,7 @@ public class StorageController : ControllerBase
                 - Ersetze ausgeschriebene Zahlen („drei“) durch Ziffern (3).  
                 - Normalisiere Leer‑ und Sonderzeichen (Trim, keine führenden/trailenden Leerzeichen).  
                 - Wenn ein Satz kein valides Kommando enthält, ignoriere ihn schlicht.  
+                - Bei Suchen soll der Itemname gesetzt werden, der Ort wird allerdings nicht identifiziert und bleibt leer.
                 - Falls du offensichtliche Rechtschreibfehler erkennst, die der Transkriptor erzeugt haben könnte, korrigiere diese. Das kommt aber relativ selten vor.
                 - Filler‑Wörter: Entferne Artikel (der, die, das) und Füllwörter, aber nur soweit, dass der eigentliche Artikelname klar bleibt.    
 
@@ -140,7 +141,12 @@ public class StorageController : ControllerBase
         {
             if (cmd.Method == METHODS.ENTNAHME)
             {
-                var storageItem = await FindStorageItemByNameAndLocation(cmd);
+                if (string.IsNullOrEmpty(cmd.Destination))
+                {
+                    return new BadRequestResult();
+                }
+
+                var storageItem = await FindStorageItemByName(cmd);
 
                 await _dbContext.DeleteAsync(storageItem);
 
@@ -155,7 +161,7 @@ public class StorageController : ControllerBase
 
             if (cmd.Method == METHODS.SUCHE)
             {
-                var storageItem = await FindStorageItemByNameAndLocation(cmd);
+                var storageItem = await FindStorageItemByName(cmd);
 
                 _logger.LogInformation("{itemName} befindet sich hier: {storageItemDestination}",
                     cmd.ItemName,
@@ -165,7 +171,12 @@ public class StorageController : ControllerBase
 
             if (cmd.Method == METHODS.UMLAGERN)
             {
-                var storageItem = await FindStorageItemByNameAndLocation(cmd);
+                if (string.IsNullOrEmpty(cmd.Destination))
+                {
+                    return new BadRequestResult();
+                }
+
+                var storageItem = await FindStorageItemByName(cmd);
 
                 storageItem.Location = cmd.Destination;
 
@@ -183,6 +194,11 @@ public class StorageController : ControllerBase
 
             if (cmd.Method == METHODS.EINLAGERN)
             {
+                if (string.IsNullOrEmpty(cmd.Destination))
+                {
+                    return new BadRequestResult();
+                }
+
                 var storageItem = new StorageItem
                 {
                     Id = Guid.NewGuid().ToString(),
@@ -202,13 +218,11 @@ public class StorageController : ControllerBase
         }
 
         _logger.LogDebug("Anzahl an Ergebnissen: {performedActions}", performedActions.Count().ToString());
-        string results = string.Join("\n", performedActions);
-        _logger.LogDebug("Ergebnisse: {results}", results);
 
-        return Ok(results);
+        return Ok(performedActions);
     }
 
-    private async Task<StorageItem> FindStorageItemByNameAndLocation(StorageCommand cmd)
+    private async Task<StorageItem> FindStorageItemByName(StorageCommand cmd)
     {
         var normalizedQuery = cmd.ItemName.NormalizeForSearch();
         _logger.LogDebug("itemname: {itemname}", cmd.ItemName);
@@ -276,7 +290,7 @@ public class StorageController : ControllerBase
             new UrlSource(presignedUrl),
             new PreRecordedSchema()
             {
-                Model = "nova-3",
+                Model = "nova-2",
                 Punctuate = true,
                 Language = "de",
             });
