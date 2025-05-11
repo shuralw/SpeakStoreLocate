@@ -15,6 +15,10 @@ using OpenAI.Chat;
 using Deepgram;
 using Deepgram.Clients.Interfaces.v1;
 using Deepgram.Models.PreRecorded.v1;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 
 namespace SpeakStoreLocate.ApiService;
 
@@ -29,7 +33,9 @@ public class StorageController : ControllerBase
     private readonly ChatClient chatClient;
     private readonly ILogger<StorageController> _logger;
     private readonly IListenRESTClient deepgramClient;
+    private readonly HttpClient _elevenlabsHttpClient;
     private const string BucketName = "speech-storage-bucket";
+
 
     public StorageController(IConfiguration configuration, OpenAIClient openAiClient,
         IOptions<OpenAIOptions> openAIOptions, ILogger<StorageController> logger)
@@ -60,6 +66,15 @@ public class StorageController : ControllerBase
 
         // Set "DEEPGRAM_API_KEY" environment variable to your Deepgram API Key
         this.deepgramClient = ClientFactory.CreateListenRESTClient();
+
+        string elevenLabsApiKey = configuration["ELEVENLABS_API_KEY"];
+        _elevenlabsHttpClient = new HttpClient
+        {
+            BaseAddress = new Uri("https://api.elevenlabs.io")
+        };
+        // direkt nach Erzeugung des HttpClient
+        _elevenlabsHttpClient.DefaultRequestHeaders.Clear();
+        _elevenlabsHttpClient.DefaultRequestHeaders.Add("xi-api-key", elevenLabsApiKey);
     }
 
     [HttpGet]
@@ -74,7 +89,7 @@ public class StorageController : ControllerBase
     [HttpPost("upload-audio")]
     public async Task<IActionResult> UploadAudio([FromForm] AudioUploadRequest request)
     {
-        var transcriptedText = await TranscriptAudioAsync(request);
+        var transcriptedText = await TranscriptAudioAsync_Elevenlabs(request);
 
         // Bau den Prompt
         var systemPrompt = @"
@@ -266,24 +281,64 @@ public class StorageController : ControllerBase
         return commands;
     }
 
+    private async Task<string> TranscriptAudioAsync_Elevenlabs(AudioUploadRequest request)
+    {
+        // 1) Datei in MemoryStream laden
+        using var ms = new MemoryStream();
+        await request.AudioFile.CopyToAsync(ms);
+        ms.Position = 0;
+
+        // 2) Multipart/FormData-Content aufbauen
+        using var content = new MultipartFormDataContent();
+        // ⟶ unbedingt model_id mitsenden
+        content.Add(new StringContent("scribe_v1"), "model_id");
+        // ⟶ optional Sprache angeben
+        content.Add(new StringContent("de"), "language_code");
+
+        // ⟶ und das File-Form-Field muss „file“ heißen, nicht „audio“
+        var fileContent = new ByteArrayContent(ms.ToArray());
+        fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse(request.AudioFile.ContentType);
+        content.Add(fileContent, "file", request.AudioFile.FileName);
+
+        // 3) Request absetzen
+        var response = await _elevenlabsHttpClient.PostAsync("/v1/speech-to-text", content);
+
+        // 4) Antwort-Body immer erst auslesen, dann EnsureSuccess oder eigenes Logging
+        var body = await response.Content.ReadAsStringAsync();
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError("ElevenLabs Scribe API Fehler {StatusCode}: {Body}",
+                response.StatusCode, body);
+            throw new Exception($"Transkription fehlgeschlagen ({response.StatusCode}): {body}");
+        }
+
+        // 5) JSON parsen und reines Text-Feld zurückgeben
+        var result = JsonSerializer.Deserialize<ScribeResponse>(body,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        return result?.Text ?? string.Empty;
+    }
+
     private async Task<string> TranscriptAudioAsync(AudioUploadRequest request)
     {
         // 1) Datei in S3 hochladen
         var fileTransferUtility = new TransferUtility(_s3Client);
+        string filename = "speak-store-locate-request-" + Guid.NewGuid().ToString();
+
         using (var ms = new MemoryStream())
         {
             await request.AudioFile.CopyToAsync(ms);
             ms.Position = 0;
-            await fileTransferUtility.UploadAsync(ms, BucketName, request.AudioFile.FileName);
+            await fileTransferUtility.UploadAsync(ms, BucketName, filename);
         }
 
         // 2) PreSigned URL erstellen (5 Minuten gültig)
         var presignRequest = new GetPreSignedUrlRequest
         {
             BucketName = BucketName,
-            Key = request.AudioFile.FileName,
+            Key = filename,
             Expires = DateTime.UtcNow.AddMinutes(5)
         };
+
         string presignedUrl = _s3Client.GetPreSignedURL(presignRequest);
 
         var response = await deepgramClient.TranscribeUrl(
@@ -353,6 +408,15 @@ public class METHODS
 public class AudioUploadRequest
 {
     public IFormFile AudioFile { get; set; }
+}
+
+// Modell für das Response-Fragment
+public class ScribeResponse
+{
+    [JsonPropertyName("text")] public string Text { get; set; }
+
+    // Falls Ihr die Words-/Timestamp-Daten braucht, ergänzt hier z.B.:
+    // public List<WordInfo> Words { get; set; }
 }
 
 [DynamoDBTable("StorageItems")]
