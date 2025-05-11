@@ -36,7 +36,24 @@
     "record-button"
     "table-of-storageitems";
   grid-gap: 24px;
+  position: relative; /* damit das Overlay relativ dazu positioniert */
 }
+
+/* schwebende Meldung */
+.recording-indicator {
+  position: absolute;
+  top: 0;      
+  right: 0;    /* oben rechts innerhalb von .page-layout */
+  transform: translate(0, -100%); /* knapp oberhalb des Buttons */
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  white-space: nowrap;
+  font-weight: bold;
+  pointer-events: none; /* klickbar dahinter bleiben */
+}
+
 
 .table-of-storageitems {
   grid-area: table-of-storageitems;
