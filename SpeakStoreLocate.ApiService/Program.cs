@@ -1,4 +1,7 @@
 using System.ClientModel;
+using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.DataModel;
+using Amazon.Extensions.NETCore.Setup;
 using Amazon.S3;
 using Amazon.TranscribeService;
 using Microsoft.Extensions.Options;
@@ -52,13 +55,14 @@ public class Program
 
         builder.Services.Configure<OpenAIOptions>(builder.Configuration.GetSection("OpenAI"));
 
-        // var awsCredentials = new Amazon.Runtime.BasicAWSCredentials(awsOptions["AccessKey"], awsOptions["SecretKey"]);
-        var awsRegion = Amazon.RegionEndpoint.EUCentral1;
-        var awsCredentials =
-            new Amazon.Runtime.BasicAWSCredentials("***", "***");
-        builder.Services.AddSingleton<AmazonS3Client>(sp => new AmazonS3Client(awsCredentials, awsRegion));
-        builder.Services.AddSingleton<AmazonTranscribeServiceClient>(sp =>
-            new AmazonTranscribeServiceClient(awsCredentials, awsRegion));
+        var awsOptions = builder.Configuration.GetAWSOptions("AWS");
+        builder.Services.AddDefaultAWSOptions(awsOptions); // Lädt Profile+Region
+        builder.Services.AddAWSService<IAmazonS3>(); // Fügt S3Client mit Default Credentials
+        builder.Services.AddAWSService<IAmazonTranscribeService>(); // Fügt TranscribeClient
+        builder.Services.AddAWSService<IAmazonDynamoDB>(); // DynamoDBClient
+// 4. DynamoDBContext für DataModel-API
+        builder.Services.AddScoped<IDynamoDBContext>(sp => new DynamoDBContext(sp.GetRequiredService<IAmazonDynamoDB>())
+        );
 
 
 // 2. OpenAIClient registrieren
@@ -74,6 +78,11 @@ public class Program
                 Endpoint = new Uri(opts.BaseUrl),
             });
         });
+
+        builder.Services.AddScoped<ITranscriptionService, ElevenlabsTranscriptionService>();
+        builder.Services.AddScoped<IStorageRepository, AwsStorageRepository>();
+        builder.Services.AddScoped<IChatCompletionService, OpenAiChatCompletionService>();
+        builder.Services.AddScoped<IInterpretationService, InterpretationService>();
 
         builder.Services.AddControllers();
         // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -92,7 +101,7 @@ public class Program
             app.UseSwagger();
             app.UseSwaggerUI();
         }
-        
+
         app.UseCors("DefaultCorsPolicy");
         app.UseHttpsRedirection();
 
