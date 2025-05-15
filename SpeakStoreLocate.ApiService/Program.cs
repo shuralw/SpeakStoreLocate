@@ -2,6 +2,7 @@ using System.ClientModel;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.DataModel;
 using Amazon.Extensions.NETCore.Setup;
+using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.TranscribeService;
 using Microsoft.Extensions.Options;
@@ -56,7 +57,12 @@ public class Program
         builder.Services.Configure<OpenAIOptions>(builder.Configuration.GetSection("OpenAI"));
 
         var awsOptions = builder.Configuration.GetAWSOptions("AWS");
-        builder.Services.AddDefaultAWSOptions(awsOptions); // Lädt Profile+Region
+// bind your own keys from Configuration:
+        awsOptions.Credentials = new BasicAWSCredentials(
+            builder.Configuration["AWS:AccessKey"],
+            builder.Configuration["AWS:SecretKey"]
+        );
+        builder.Services.AddDefaultAWSOptions(awsOptions);
         builder.Services.AddAWSService<IAmazonS3>(); // Fügt S3Client mit Default Credentials
         builder.Services.AddAWSService<IAmazonTranscribeService>(); // Fügt TranscribeClient
         builder.Services.AddAWSService<IAmazonDynamoDB>(); // DynamoDBClient
