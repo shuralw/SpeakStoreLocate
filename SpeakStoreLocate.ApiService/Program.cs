@@ -8,6 +8,11 @@ using Amazon.TranscribeService;
 using Microsoft.Extensions.Options;
 using OpenAI;
 using Serilog;
+using SpeakStoreLocate.ApiService.Options;
+using SpeakStoreLocate.ApiService.Services.ChatCompletion;
+using SpeakStoreLocate.ApiService.Services.Interpretation;
+using SpeakStoreLocate.ApiService.Services.Storage;
+using SpeakStoreLocate.ApiService.Services.Transcription;
 using SpeakStoreLocate.ServiceDefaults;
 
 namespace SpeakStoreLocate.ApiService;

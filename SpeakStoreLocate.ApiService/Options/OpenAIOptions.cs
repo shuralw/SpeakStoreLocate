@@ -1,6 +1,6 @@
 ﻿// OpenAIOptions.cs
 
-namespace SpeakStoreLocate.ApiService
+namespace SpeakStoreLocate.ApiService.Options
 {
     public class OpenAIOptions
     {

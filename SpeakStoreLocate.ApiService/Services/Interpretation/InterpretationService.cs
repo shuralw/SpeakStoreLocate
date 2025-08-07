@@ -1,8 +1,9 @@
 using System.Text;
 using System.Text.Json;
-using Amazon.DynamoDBv2.DataModel;
+using SpeakStoreLocate.ApiService.Models;
+using SpeakStoreLocate.ApiService.Services.ChatCompletion;
 
-namespace SpeakStoreLocate.ApiService;
+namespace SpeakStoreLocate.ApiService.Services.Interpretation;
 
 class InterpretationService(ILogger<InterpretationService> _logger, IChatCompletionService _chatCompletionService)
     : IInterpretationService

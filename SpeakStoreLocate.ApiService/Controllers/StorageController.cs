@@ -2,8 +2,12 @@
 using Amazon.TranscribeService;
 using Deepgram.Clients.Interfaces.v1;
 using Microsoft.AspNetCore.Mvc;
+using SpeakStoreLocate.ApiService.Models;
+using SpeakStoreLocate.ApiService.Services.Interpretation;
+using SpeakStoreLocate.ApiService.Services.Storage;
+using SpeakStoreLocate.ApiService.Services.Transcription;
 
-namespace SpeakStoreLocate.ApiService;
+namespace SpeakStoreLocate.ApiService.Controllers;
 
 [ApiController]
 [Route("api/storage")]

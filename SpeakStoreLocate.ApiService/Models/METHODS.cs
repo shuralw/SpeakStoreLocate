@@ -1,4 +1,4 @@
-namespace SpeakStoreLocate.ApiService;
+namespace SpeakStoreLocate.ApiService.Models;
 
 public class METHODS
 {

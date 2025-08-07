@@ -1,4 +1,4 @@
-namespace SpeakStoreLocate.ApiService;
+namespace SpeakStoreLocate.ApiService.Services.ChatCompletion;
 
 internal interface IChatCompletionService
 {

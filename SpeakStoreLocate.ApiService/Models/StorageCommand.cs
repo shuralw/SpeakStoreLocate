@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace SpeakStoreLocate.ApiService;
+namespace SpeakStoreLocate.ApiService.Models;
 
 public class StorageCommand
 {

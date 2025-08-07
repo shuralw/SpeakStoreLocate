@@ -1,4 +1,6 @@
-namespace SpeakStoreLocate.ApiService;
+using SpeakStoreLocate.ApiService.Models;
+
+namespace SpeakStoreLocate.ApiService.Services.Interpretation;
 
 public  interface IInterpretationService
 {

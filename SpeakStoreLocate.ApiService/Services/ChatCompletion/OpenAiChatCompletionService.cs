@@ -1,8 +1,9 @@
 using Microsoft.Extensions.Options;
 using OpenAI;
 using OpenAI.Chat;
+using SpeakStoreLocate.ApiService.Options;
 
-namespace SpeakStoreLocate.ApiService;
+namespace SpeakStoreLocate.ApiService.Services.ChatCompletion;
 
 class OpenAiChatCompletionService : IChatCompletionService
 {
@@ -23,7 +24,7 @@ class OpenAiChatCompletionService : IChatCompletionService
 
     public async Task<string> CompleteChat(string prompt)
     {
-        ChatCompletion completion =
+        OpenAI.Chat.ChatCompletion completion =
             await _chatClient.CompleteChatAsync(prompt);
 
         var result = completion.Content[0].Text;
