@@ -85,7 +85,8 @@ public class Program
             });
         });
 
-        builder.Services.AddScoped<ITranscriptionService, ElevenlabsTranscriptionService>();
+        //builder.Services.AddScoped<ITranscriptionService, ElevenlabsTranscriptionService>();
+        builder.Services.AddScoped<ITranscriptionService, DeepgramTranscriptionService>();
         builder.Services.AddScoped<IStorageRepository, AwsStorageRepository>();
         builder.Services.AddScoped<IChatCompletionService, OpenAiChatCompletionService>();
         builder.Services.AddScoped<IInterpretationService, InterpretationService>();

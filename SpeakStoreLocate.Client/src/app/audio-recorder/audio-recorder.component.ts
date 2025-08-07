@@ -14,14 +14,15 @@ export interface PeriodicElement {
 })
 export class AudioRecorderComponent implements OnInit {
 
-  private readonly API_BASE = 'https://mkxrivn8wy.eu-central-1.awsapprunner.com/api/storage';
-  // private readonly API_BASE = 'http://localhost:5471/api/storage';
+  // private readonly API_BASE = 'https://mkxrivn8wy.eu-central-1.awsapprunner.com/api/storage';
+  private readonly API_BASE = 'http://localhost:5471/api/storage';
   dataSource: PeriodicElement[] = [];
   displayedColumns = ['location', 'name'];
 
   isRecording = false;
   showPopup = false;
   isSuccess = false;
+
   popupMessage = '';
 
   private mediaRecorder?: MediaRecorder;

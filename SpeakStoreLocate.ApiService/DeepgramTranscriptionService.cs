@@ -3,9 +3,7 @@ using Amazon.S3.Model;
 using Amazon.S3.Transfer;
 using Deepgram;
 using Deepgram.Clients.Interfaces.v1;
-using Deepgram;
-using Deepgram.Clients.Interfaces.v1;
-using Deepgram.Models.PreRecorded.v1;
+using Deepgram.Models.Listen.v1.REST;
 
 namespace SpeakStoreLocate.ApiService;
 
@@ -32,36 +30,48 @@ public class DeepgramTranscriptionService : ITranscriptionService
         _s3Client = new AmazonS3Client(awsCredentials, s3Config);
     }
 
-    public async Task<string> TranscriptAudioAsync(AudioUploadRequest request)
+    public async Task<string> TranscriptAudioAsync_Local(AudioUploadRequest request)
     {
-        // 1) Datei in S3 hochladen
-        var fileTransferUtility = new TransferUtility(_s3Client);
-        string filename = "speak-store-locate-request-" + Guid.NewGuid().ToString();
-
+        byte[] audioBytes;
         using (var ms = new MemoryStream())
         {
             await request.AudioFile.CopyToAsync(ms);
-            ms.Position = 0;
-            await fileTransferUtility.UploadAsync(ms, _bucketName, filename);
+            audioBytes = ms.ToArray();
         }
 
-        // 2) PreSigned URL erstellen (5 Minuten gültig)
-        var presignRequest = new GetPreSignedUrlRequest
-        {
-            BucketName = _bucketName,
-            Key = filename,
-            Expires = DateTime.UtcNow.AddMinutes(5)
-        };
-
-        string presignedUrl = _s3Client.GetPreSignedURL(presignRequest);
-
-        var response = await deepgramClient.TranscribeUrl(
-            new UrlSource(presignedUrl),
+        var response = await deepgramClient.TranscribeFile(
+            audioBytes,
             new PreRecordedSchema()
             {
                 Model = "nova-2",
+                SmartFormat = true,
+            });
+
+
+        Console.WriteLine($"\n\n{response}\n\n");
+        Console.WriteLine("Press any key to exit...");
+        return "";
+        // Teardown Library Library.Terminate();
+
+    }
+    public async Task<string> TranscriptAudioAsync(AudioUploadRequest request)
+    {
+
+        byte[] audioBytes;
+        using (var ms = new MemoryStream())
+        {
+            await request.AudioFile.CopyToAsync(ms);
+            audioBytes = ms.ToArray();
+        }
+
+        var response = await deepgramClient.TranscribeFile(
+            audioBytes,
+            new PreRecordedSchema()
+            {
+                Model = "nova-3-general",
                 Punctuate = true,
-                Language = "de",
+                Language = "multi",
+                SmartFormat = true,
             });
 
         // 1. Für jeden Kanal die beste Alternative herausholen
