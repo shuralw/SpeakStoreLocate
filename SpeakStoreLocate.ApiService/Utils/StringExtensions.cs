@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Text;
 
+namespace SpeakStoreLocate.ApiService.Utils;
+
 public static class StringExtensions
 {
     public static string NormalizeForSearch(this string input)

@@ -1,7 +1,9 @@
 using Amazon.DynamoDBv2.DataModel;
 using Amazon.DynamoDBv2.DocumentModel;
+using SpeakStoreLocate.ApiService.Models;
+using SpeakStoreLocate.ApiService.Utils;
 
-namespace SpeakStoreLocate.ApiService;
+namespace SpeakStoreLocate.ApiService.Services.Storage;
 
 public class AwsStorageRepository : IStorageRepository
 {

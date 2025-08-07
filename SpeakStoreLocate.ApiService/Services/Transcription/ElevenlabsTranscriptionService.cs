@@ -1,7 +1,8 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
+using SpeakStoreLocate.ApiService.Models;
 
-namespace SpeakStoreLocate.ApiService;
+namespace SpeakStoreLocate.ApiService.Services.Transcription;
 
 public class ElevenlabsTranscriptionService : ITranscriptionService
 {

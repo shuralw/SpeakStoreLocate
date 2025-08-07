@@ -1,6 +1,7 @@
 using Amazon.TranscribeService;
+using SpeakStoreLocate.ApiService.Models;
 
-namespace SpeakStoreLocate.ApiService;
+namespace SpeakStoreLocate.ApiService.Services.Transcription;
 
 public class AwsTranscriptionService(IConfiguration configuration, IAmazonTranscribeService amazonTranscribeService)
     : ITranscriptionService

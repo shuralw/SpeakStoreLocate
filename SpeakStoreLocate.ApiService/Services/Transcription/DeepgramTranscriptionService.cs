@@ -1,11 +1,10 @@
 using Amazon.S3;
-using Amazon.S3.Model;
-using Amazon.S3.Transfer;
 using Deepgram;
 using Deepgram.Clients.Interfaces.v1;
 using Deepgram.Models.Listen.v1.REST;
+using SpeakStoreLocate.ApiService.Models;
 
-namespace SpeakStoreLocate.ApiService;
+namespace SpeakStoreLocate.ApiService.Services.Transcription;
 
 public class DeepgramTranscriptionService : ITranscriptionService
 {
