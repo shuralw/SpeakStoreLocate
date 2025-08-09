@@ -1,0 +1,20 @@
+2025-08-08 21:08:30.413 [Information] DeepgramHttpClientOptions: OnPrem: False
+2025-08-08 21:08:30.416 [Information] DeepgramHttpClientOptions: APIVersion: v1
+2025-08-08 21:08:30.417 [Warning] DeepgramHttpClientOptions: API KEY environment variable not set
+2025-08-08 21:08:30.417 [Error] DeepgramHttpClientOptions: Deepgram API Key is invalid
+2025-08-08 21:08:42.571 [Information] DeepgramHttpClientOptions: OnPrem: False
+2025-08-08 21:08:42.572 [Information] DeepgramHttpClientOptions: APIVersion: v1
+2025-08-08 21:08:42.572 [Warning] DeepgramHttpClientOptions: API KEY environment variable not set
+2025-08-08 21:08:42.573 [Error] DeepgramHttpClientOptions: Deepgram API Key is invalid
+2025-08-08 21:08:58.023 [Information] DeepgramHttpClientOptions: OnPrem: False
+2025-08-08 21:08:58.024 [Information] DeepgramHttpClientOptions: APIVersion: v1
+2025-08-08 21:08:58.024 [Warning] DeepgramHttpClientOptions: API KEY environment variable not set
+2025-08-08 21:08:58.025 [Error] DeepgramHttpClientOptions: Deepgram API Key is invalid
+2025-08-08 21:10:04.789 [Information] DeepgramHttpClientOptions: OnPrem: False
+2025-08-08 21:10:04.792 [Information] DeepgramHttpClientOptions: APIVersion: v1
+2025-08-08 21:10:04.793 [Warning] DeepgramHttpClientOptions: API KEY environment variable not set
+2025-08-08 21:10:04.793 [Error] DeepgramHttpClientOptions: Deepgram API Key is invalid
+2025-08-08 21:29:00.140 [Information] DeepgramHttpClientOptions: OnPrem: False
+2025-08-08 21:29:00.143 [Information] DeepgramHttpClientOptions: APIVersion: v1
+2025-08-08 21:29:00.144 [Warning] DeepgramHttpClientOptions: API KEY environment variable not set
+2025-08-08 21:29:00.145 [Error] DeepgramHttpClientOptions: Deepgram API Key is invalid

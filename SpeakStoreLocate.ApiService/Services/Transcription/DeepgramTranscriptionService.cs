@@ -2,7 +2,9 @@ using Amazon.S3;
 using Deepgram;
 using Deepgram.Clients.Interfaces.v1;
 using Deepgram.Models.Listen.v1.REST;
+using Microsoft.Extensions.Options;
 using SpeakStoreLocate.ApiService.Models;
+using SpeakStoreLocate.ApiService.Options;
 
 namespace SpeakStoreLocate.ApiService.Services.Transcription;
 
@@ -12,11 +14,10 @@ public class DeepgramTranscriptionService : ITranscriptionService
     private readonly AmazonS3Client _s3Client;
     private readonly string _bucketName;
 
-    public DeepgramTranscriptionService(IConfiguration configuration)
+    public DeepgramTranscriptionService(IConfiguration configuration, IOptions<DeepgramOptions> options)
     {
         // Set "DEEPGRAM_API_KEY" environment variable to your Deepgram API Key
-
-        this.deepgramClient = ClientFactory.CreateListenRESTClient();
+        this.deepgramClient = ClientFactory.CreateListenRESTClient(options.Value.ApiKey);
 
         var awsOptions = configuration.GetSection("AWS");
         var awsCredentials = new Amazon.Runtime.BasicAWSCredentials(awsOptions["AccessKey"], awsOptions["SecretKey"]);
@@ -51,11 +52,10 @@ public class DeepgramTranscriptionService : ITranscriptionService
         Console.WriteLine("Press any key to exit...");
         return "";
         // Teardown Library Library.Terminate();
-
     }
+
     public async Task<string> TranscriptAudioAsync(AudioUploadRequest request)
     {
-
         byte[] audioBytes;
         using (var ms = new MemoryStream())
         {

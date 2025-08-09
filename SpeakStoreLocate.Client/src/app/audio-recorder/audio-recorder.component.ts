@@ -1,4 +1,5 @@
 import { Component, NgZone, OnInit } from '@angular/core';
+import { AudioCache } from './audio-cache';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
@@ -33,6 +34,10 @@ export class AudioRecorderComponent implements OnInit {
 
   async ngOnInit() {
     this.dataSource = await this.getTableItems();
+    // Try to upload cached audio blobs on startup
+    await AudioCache.uploadAll(async (blob: Blob) => {
+      await this.uploadAudio(blob, true);
+    });
   }
 
   async onPointerDown(evt: PointerEvent, btn: HTMLElement) {
@@ -87,29 +92,34 @@ export class AudioRecorderComponent implements OnInit {
     let result = await this.uploadAudio(blob);
   }
 
-  private async uploadAudio(blob: Blob): Promise<void> {
-    const form = new FormData();
-    form.append('audioFile', blob, 'recording.webm');
-  
-    try {
-      // Wir erwarten jetzt ein JSON-Array von Strings vom Server
-      const results = await firstValueFrom(
-        this.http.post<string[]>(`${this.API_BASE}/upload-audio`, form)
-      );
-  
-      // Für jedes Resultat eine Meldung anzeigen
-      for (const res of results) {
-        this.showResult(true, `Erfolgreich gespeichert: ${res}`);
-        // Warten bis das Popup wieder verschwindet, bevor wir das nächste anzeigen
-        await new Promise(resolve => setTimeout(resolve, 5500));
+    private async uploadAudio(blob: Blob, isRetry = false): Promise<void> {
+      const form = new FormData();
+      form.append('audioFile', blob, 'recording.webm');
+
+      try {
+        // Wir erwarten jetzt ein JSON-Array von Strings vom Server
+        const results = await firstValueFrom(
+          this.http.post<string[]>(`${this.API_BASE}/upload-audio`, form)
+        );
+
+        // Für jedes Resultat eine Meldung anzeigen
+        for (const res of results) {
+          this.showResult(true, `Erfolgreich gespeichert: ${res}`);
+          // Warten bis das Popup wieder verschwindet, bevor wir das nächste anzeigen
+          await new Promise(resolve => setTimeout(resolve, 5500));
+        }
+
+        // Tabelle anschließend einmalig aktualisieren
+        this.dataSource = await this.getTableItems();
+      } catch {
+        if (!isRetry) {
+          await AudioCache.save(blob);
+          this.showResult(false, 'Offline: Audio wurde lokal gespeichert und wird später hochgeladen.');
+        } else {
+          this.showResult(false, 'Fehler beim Speichern!');
+        }
       }
-  
-      // Tabelle anschließend einmalig aktualisieren
-      this.dataSource = await this.getTableItems();
-    } catch {
-      this.showResult(false, 'Fehler beim Speichern!');
     }
-  }
   
 
   private showResult(success: boolean, message: string) {

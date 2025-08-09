@@ -22,7 +22,15 @@ public class Program
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+        builder.Services.Configure<DeepgramOptions>(builder.Configuration.GetSection("Deepgram"));
+        builder.Services.Configure<ElevenLabsOptions>(builder.Configuration.GetSection("ElevenLabs"));
+        builder.Services.Configure<OpenAIOptions>(builder.Configuration.GetSection("OpenAI"));
+        builder.Services.Configure<AmazonS3Options>(builder.Configuration.GetSection("AWS:S3"));
+        builder.Services.Configure<AmazonTranscribeServiceOptions>(builder.Configuration.GetSection("AWS:Transcribe"));
+        builder.Services.Configure<AmazonDynamoDBOptions>(builder.Configuration.GetSection("AWS:DynamoDB"));
 
+
+        // Serilog-Logger initialisieren    
         Log.Logger = new LoggerConfiguration()
             .ReadFrom.Configuration(builder.Configuration)
             .Enrich.FromLogContext()
@@ -61,16 +69,32 @@ public class Program
 
         builder.Services.Configure<OpenAIOptions>(builder.Configuration.GetSection("OpenAI"));
 
-        var awsOptions = builder.Configuration.GetAWSOptions("AWS");
-// bind your own keys from Configuration:
-        awsOptions.Credentials = new BasicAWSCredentials(
-            builder.Configuration["AWS:AccessKey"],
-            builder.Configuration["AWS:SecretKey"]
-        );
-        builder.Services.AddDefaultAWSOptions(awsOptions);
-        builder.Services.AddAWSService<IAmazonS3>(); // Fügt S3Client mit Default Credentials
-        builder.Services.AddAWSService<IAmazonTranscribeService>(); // Fügt TranscribeClient
-        builder.Services.AddAWSService<IAmazonDynamoDB>(); // DynamoDBClient
+        builder.Services.AddDefaultAWSOptions(sp =>
+        {
+            var opts = sp.GetRequiredService<IOptions<AmazonS3LoginOptions>>().Value;
+
+            return new AWSOptions
+            {
+                Credentials = new BasicAWSCredentials(opts.AccessKey, opts.SecretKey),
+                Region = opts.Region != null
+                    ? Amazon.RegionEndpoint.GetBySystemName(opts.Region)
+                    : throw new InvalidOperationException("AWS Region is not configured!")
+            };
+        });
+
+        builder.Services.AddAWSService<IAmazonS3>(ServiceLifetime.Singleton);
+        builder.Services.AddAWSService<IAmazonTranscribeService>((sp, cfg) =>
+        {
+            var opts = sp.GetRequiredService<IOptions<AmazonTranscribeServiceOptions>>().Value;
+            cfg.Credentials = new BasicAWSCredentials(opts.AccessKey, opts.SecretKey);
+            cfg.Region = opts.Region;
+        });
+        builder.Services.AddAWSService<IAmazonDynamoDB>((sp, cfg) =>
+        {
+            var opts = sp.GetRequiredService<IOptions<AmazonDynamoDBOptions>>().Value;
+            cfg.Credentials = new BasicAWSCredentials(opts.AccessKey, opts.SecretKey);
+            cfg.Region = opts.Region;
+        });
 // 4. DynamoDBContext für DataModel-API
         builder.Services.AddScoped<IDynamoDBContext>(sp => new DynamoDBContext(sp.GetRequiredService<IAmazonDynamoDB>())
         );
