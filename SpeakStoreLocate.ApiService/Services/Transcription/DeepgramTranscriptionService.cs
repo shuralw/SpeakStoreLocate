@@ -2,92 +2,102 @@ using Amazon.S3;
 using Deepgram;
 using Deepgram.Clients.Interfaces.v1;
 using Deepgram.Models.Listen.v1.REST;
+using Microsoft.Extensions.Options;
 using SpeakStoreLocate.ApiService.Models;
+using SpeakStoreLocate.ApiService.Options;
 
 namespace SpeakStoreLocate.ApiService.Services.Transcription;
 
 public class DeepgramTranscriptionService : ITranscriptionService
 {
-    private readonly IListenRESTClient deepgramClient;
-    private readonly AmazonS3Client _s3Client;
-    private readonly string _bucketName;
+    private readonly IListenRESTClient _deepgramClient;
+    private readonly IAmazonS3 _s3Client;
+    private readonly AmazonS3Options _s3Options;
+    private readonly ILogger<DeepgramTranscriptionService> _logger;
 
-    public DeepgramTranscriptionService(IConfiguration configuration)
+    public DeepgramTranscriptionService(
+        IOptions<DeepgramOptions> deepgramOptions,
+        IAmazonS3 s3Client,
+        IOptions<AmazonS3Options> s3Options,
+        ILogger<DeepgramTranscriptionService> logger)
     {
-        // Set "DEEPGRAM_API_KEY" environment variable to your Deepgram API Key
-
-        this.deepgramClient = ClientFactory.CreateListenRESTClient();
-
-        var awsOptions = configuration.GetSection("AWS");
-        var awsCredentials = new Amazon.Runtime.BasicAWSCredentials(awsOptions["AccessKey"], awsOptions["SecretKey"]);
-        var awsRegion = Amazon.RegionEndpoint.GetBySystemName(awsOptions["Region"]);
-
-
-        this._bucketName = configuration["AWS:BucketName"];
-
-        var s3Config = new AmazonS3Config { RegionEndpoint = awsRegion };
-        _s3Client = new AmazonS3Client(awsCredentials, s3Config);
+        _deepgramClient = ClientFactory.CreateListenRESTClient(deepgramOptions.Value.ApiKey);
+        _s3Client = s3Client;
+        _s3Options = s3Options.Value;
+        _logger = logger;
     }
 
     public async Task<string> TranscriptAudioAsync_Local(AudioUploadRequest request)
     {
-        byte[] audioBytes;
-        using (var ms = new MemoryStream())
+        try
         {
-            await request.AudioFile.CopyToAsync(ms);
-            audioBytes = ms.ToArray();
-        }
-
-        var response = await deepgramClient.TranscribeFile(
-            audioBytes,
-            new PreRecordedSchema()
+            byte[] audioBytes;
+            using (var ms = new MemoryStream())
             {
-                Model = "nova-2",
-                SmartFormat = true,
-            });
+                await request.AudioFile.CopyToAsync(ms);
+                audioBytes = ms.ToArray();
+            }
 
+            var response = await _deepgramClient.TranscribeFile(
+                audioBytes,
+                new PreRecordedSchema()
+                {
+                    Model = "nova-2",
+                    SmartFormat = true,
+                });
 
-        Console.WriteLine($"\n\n{response}\n\n");
-        Console.WriteLine("Press any key to exit...");
-        return "";
-        // Teardown Library Library.Terminate();
-
+            _logger.LogInformation("Deepgram transcription completed for local processing");
+            return response?.Results?.Channels?.FirstOrDefault()?.Alternatives?.FirstOrDefault()?.Transcript ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during local audio transcription");
+            throw;
+        }
     }
+
     public async Task<string> TranscriptAudioAsync(AudioUploadRequest request)
     {
-
-        byte[] audioBytes;
-        using (var ms = new MemoryStream())
+        try
         {
-            await request.AudioFile.CopyToAsync(ms);
-            audioBytes = ms.ToArray();
-        }
-
-        var response = await deepgramClient.TranscribeFile(
-            audioBytes,
-            new PreRecordedSchema()
+            byte[] audioBytes;
+            using (var ms = new MemoryStream())
             {
-                Model = "nova-3-general",
-                Punctuate = true,
-                Language = "multi",
-                SmartFormat = true,
-            });
+                await request.AudioFile.CopyToAsync(ms);
+                audioBytes = ms.ToArray();
+            }
 
-        // 1. Für jeden Kanal die beste Alternative herausholen
-        var bestTranscriptionPerChannel = response
-            .Results
-            .Channels
-            .Select(channel =>
-                channel.Alternatives
-                    .OrderByDescending(alt => alt.Confidence)
-                    .First()
-                    .Transcript
-            );
+            var response = await _deepgramClient.TranscribeFile(
+                audioBytes,
+                new PreRecordedSchema()
+                {
+                    Model = "nova-3-general",
+                    Punctuate = true,
+                    Language = "multi",
+                    SmartFormat = true,
+                });
 
-        // 2. Alle Kanal-Transkripte zu einem Gesamtstring verbinden
-        string transcriptText = string.Join(" ", bestTranscriptionPerChannel);
+            // 1. Für jeden Kanal die beste Alternative herausholen
+            var bestTranscriptionPerChannel = response
+                .Results
+                .Channels
+                .Select(channel =>
+                    channel.Alternatives
+                        .OrderByDescending(alt => alt.Confidence)
+                        .First()
+                        .Transcript
+                );
 
+            // 2. Alle Kanal-Transkripte zu einem Gesamtstring verbinden
+            string transcriptText = string.Join(" ", bestTranscriptionPerChannel);
 
-        return transcriptText;
+            _logger.LogInformation("Deepgram transcription completed successfully");
+            return transcriptText;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during audio transcription");
+            throw;
+        }
     }
 }
