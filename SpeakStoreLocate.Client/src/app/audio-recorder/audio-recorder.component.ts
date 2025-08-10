@@ -63,9 +63,9 @@ export class AudioRecorderComponent implements OnInit {
 
   private async loadCachedUploadsAsync(): Promise<void> {
     try {
-      // 1) Alle gespeicherten Audios aus dem Cache holen
+      // 1) Retrieve all stored audios from the cache
       const cached = await AudioCache.listAll();
-      // Dauer-Berechnung parallel für schnelleren UI-Aufbau
+      // Calculate duration in parallel for faster UI rendering
       const withDurations = await Promise.all(
         cached.map(async item => ({
           item,
@@ -78,9 +78,11 @@ export class AudioRecorderComponent implements OnInit {
         const upload: PendingUpload = this.buildPendingUpload(item.blob, duration, `cache-${item.id}`);
         this.zone.run(() => this.pendingUploads.push(upload));
         // 3) Upload starten, aber nicht auf Abschluss warten
-        void this.uploadAudio(upload, true).catch(() => {/* Upload-Fehler wird intern behandelt */ });
+        void this.uploadAudio(upload, true).catch((err) => { console.error('Upload error:', err); /* Upload-Fehler wird intern behandelt */ });
       }
-    } catch {/* ignore */ }
+    } catch (err) {
+      console.error('Failed to load cached uploads:', err);
+    }
   }
 
   async onPointerDown(evt: PointerEvent, btn: any) {
