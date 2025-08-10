@@ -41,14 +41,46 @@ export class AudioRecorderComponent implements OnInit {
   pendingUploads: PendingUpload[] = [];
   currentlyPlaying?: string;
 
-  constructor(private http: HttpClient, private zone: NgZone) {}
+  constructor(private http: HttpClient, private zone: NgZone) { }
 
   async ngOnInit() {
-    this.dataSource = await this.getTableItems();
-    // Try to upload cached audio blobs on startup
-    await AudioCache.uploadAll(async (blob: Blob) => {
-      await this.uploadAudio(blob, true);
-    });
+    void this.loadCachedUploadsAsync();
+    void this.loadTableAsync();
+  }
+
+  private async loadTableAsync(): Promise<void> {
+    try {
+      const items = await this.tryGetTableItems();
+      this.zone.run(() => {
+        this.dataSource = items;
+      });
+    } catch {
+      this.zone.run(() => {
+        this.dataSource = [];
+      });
+    }
+  }
+
+  private async loadCachedUploadsAsync(): Promise<void> {
+    try {
+      // 1) Alle gespeicherten Audios aus dem Cache holen
+      const cached = await AudioCache.listAll();
+      // Dauer-Berechnung parallel für schnelleren UI-Aufbau
+      const withDurations = await Promise.all(
+        cached.map(async item => ({
+          item,
+          duration: await this.getAudioDuration(item.blob)
+        }))
+      );
+
+      for (const { item, duration } of withDurations) {
+        // 2) Für jedes Audio einen PendingUpload bauen und anzeigen
+        const upload: PendingUpload = this.buildPendingUpload(item.blob, duration, `cache-${item.id}`);
+        this.zone.run(() => this.pendingUploads.push(upload));
+        // 3) Upload starten, aber nicht auf Abschluss warten
+        void this.uploadAudio(upload, true).catch(() => {/* Upload-Fehler wird intern behandelt */ });
+      }
+    } catch {/* ignore */ }
   }
 
   async onPointerDown(evt: PointerEvent, btn: any) {
@@ -84,9 +116,12 @@ export class AudioRecorderComponent implements OnInit {
 
   onPointerCancel(evt: PointerEvent, btn: any) {
     if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+      // Pointer Capture lösen und Aufnahme sauber beenden,
+      // damit onRecordingStop() den Blob bauen und den Upload anstoßen kann
       btn.releasePointerCapture(evt.pointerId);
+      this.mediaRecorder.stop();
     }
-    this.audioChunks = [];
+    // audioChunks NICHT leeren – sie werden in onRecordingStop() benötigt
     this.zone.run(() => this.isRecording = false);
   }
 
@@ -98,18 +133,10 @@ export class AudioRecorderComponent implements OnInit {
     this.stream?.getTracks().forEach(t => t.stop());
     this.stream = undefined;
 
-    // Audio-Dauer ermitteln
+    // Audio-Dauer ermitteln und PendingUpload-Objekt erstellen
     const duration = await this.getAudioDuration(blob);
-    
-    // Zu Pending-Liste hinzufügen
-    const upload: PendingUpload = {
-      id: Date.now().toString(),
-      blob,
-      duration,
-      isUploading: false,
-      audioUrl: URL.createObjectURL(blob)
-    };
-    
+    const upload = this.buildPendingUpload(blob, duration);
+
     this.zone.run(() => {
       this.pendingUploads.push(upload);
     });
@@ -118,26 +145,7 @@ export class AudioRecorderComponent implements OnInit {
     await this.uploadAudio(upload);
   }
 
-  private async uploadAudio(uploadOrBlob: PendingUpload | Blob, isRetry = false): Promise<void> {
-    let upload: PendingUpload;
-    
-    if (uploadOrBlob instanceof Blob) {
-      // Create temporary upload object for cached blobs
-      const duration = await this.getAudioDuration(uploadOrBlob);
-      upload = {
-        id: Date.now().toString(),
-        blob: uploadOrBlob,
-        duration,
-        isUploading: false,
-        audioUrl: URL.createObjectURL(uploadOrBlob)
-      };
-      
-      this.zone.run(() => {
-        this.pendingUploads.push(upload);
-      });
-    } else {
-      upload = uploadOrBlob;
-    }
+  private async uploadAudio(upload: PendingUpload, isRetry = false): Promise<void> {
 
     const form = new FormData();
     form.append('audioFile', upload.blob, 'recording.webm');
@@ -170,8 +178,16 @@ export class AudioRecorderComponent implements OnInit {
         await new Promise(resolve => setTimeout(resolve, 5500));
       }
 
+      // Falls es sich um einen gecachten Eintrag handelt, aus IndexedDB entfernen
+      if (upload.id.startsWith('cache-')) {
+        const numericId = parseInt(upload.id.replace('cache-', ''), 10);
+        if (!Number.isNaN(numericId)) {
+          try { await AudioCache.remove(numericId); } catch { }
+        }
+      }
+
       // Tabelle aktualisieren
-      this.dataSource = await this.getTableItems();
+      this.dataSource = await this.tryGetTableItems();
     } catch {
       // Upload fehlgeschlagen
       this.zone.run(() => {
@@ -182,9 +198,20 @@ export class AudioRecorderComponent implements OnInit {
         await AudioCache.save(upload.blob);
         this.showResult(false, 'Offline: Audio wurde lokal gespeichert und wird später hochgeladen.');
       } else {
-        this.showResult(false, 'Fehler beim Speichern!');
+        this.showResult(false, 'Fehler beim Upload!');
       }
     }
+  }
+
+  // Baut ein PendingUpload-Objekt inklusive optionaler ID
+  private buildPendingUpload(blob: Blob, duration: number, id: string = Date.now().toString()): PendingUpload {
+    return {
+      id,
+      blob,
+      duration,
+      isUploading: false,
+      audioUrl: URL.createObjectURL(blob)
+    };
   }
 
   private async getAudioDuration(blob: Blob): Promise<number> {
@@ -212,13 +239,13 @@ export class AudioRecorderComponent implements OnInit {
     if (upload.audioUrl) {
       const audio = new Audio(upload.audioUrl);
       this.currentlyPlaying = upload.id;
-      
+
       audio.addEventListener('ended', () => {
         this.zone.run(() => {
           this.currentlyPlaying = undefined;
         });
       });
-      
+
       audio.play();
     }
   }
@@ -254,9 +281,14 @@ export class AudioRecorderComponent implements OnInit {
     setTimeout(() => this.zone.run(() => this.showPopup = false), 5000);
   }
 
-  private async getTableItems(): Promise<PeriodicElement[]> {
-    return firstValueFrom(
-      this.http.get<PeriodicElement[]>(`${this.API_BASE}`)
-    );
+  private async tryGetTableItems(): Promise<PeriodicElement[]> {
+    try {
+      return firstValueFrom(
+        this.http.get<PeriodicElement[]>(`${this.API_BASE}`)
+      );
+    } catch {
+      this.showResult(false, 'Tabelle konnte nicht geladen werden.');
+      return [];
+    }
   }
 }
