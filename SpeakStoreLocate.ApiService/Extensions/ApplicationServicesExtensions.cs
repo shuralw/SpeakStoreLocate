@@ -24,7 +24,7 @@ public static class ApplicationServicesExtensions
         {
             var options = serviceProvider.GetRequiredService<IOptions<OpenAIOptions>>().Value;
             
-            if (string.IsNullOrWhiteSpace(options.ApiKey))
+            if (string.IsNullOrWhiteSpace(options.APIKEY))
                 throw new InvalidOperationException("OpenAI:ApiKey is not configured!");
 
             // Validate and ensure BaseUrl is a valid URI
@@ -36,7 +36,7 @@ public static class ApplicationServicesExtensions
                     $"OpenAI BaseUrl '{baseUrl}' is not a valid URI. Please check your configuration.");
             }
 
-            return new OpenAIClient(new ApiKeyCredential(options.ApiKey), new OpenAIClientOptions
+            return new OpenAIClient(new ApiKeyCredential(options.APIKEY), new OpenAIClientOptions
             {
                 Endpoint = validUri,
             });

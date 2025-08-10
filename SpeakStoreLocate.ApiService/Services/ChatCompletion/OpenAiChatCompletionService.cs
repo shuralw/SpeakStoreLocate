@@ -18,7 +18,7 @@ class OpenAiChatCompletionService : IChatCompletionService
         _logger = logger;
         this._chatClient = new ChatClient(
             model: openAIOptions.Value.DefaultModel,
-            apiKey: openAIOptions.Value.ApiKey
+            apiKey: openAIOptions.Value.APIKEY
         );
     }
 

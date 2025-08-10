@@ -58,7 +58,7 @@ public static class ConfigurationDebugger
             if (openAIOptions != null)
             {
                 logger.LogInformation("OpenAI Configuration:");
-                logger.LogInformation("  ApiKey: {ApiKey}", MaskCredential(openAIOptions.ApiKey));
+                logger.LogInformation("  ApiKey: {ApiKey}", MaskCredential(openAIOptions.APIKEY));
                 logger.LogInformation("  BaseUrl: {BaseUrl}", openAIOptions.BaseUrl);
                 logger.LogInformation("  DefaultModel: {DefaultModel}", openAIOptions.DefaultModel);
                 logger.LogInformation("  Temperature: {Temperature}", openAIOptions.Temperature);
