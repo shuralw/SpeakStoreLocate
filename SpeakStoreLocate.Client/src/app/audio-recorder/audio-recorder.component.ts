@@ -1,6 +1,7 @@
 import { Component, NgZone, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
+import { environment } from '../../environments/environment';
 import { AudioCache } from './audio-cache';
 
 export interface PeriodicElement {
@@ -23,8 +24,8 @@ export interface PendingUpload {
 })
 export class AudioRecorderComponent implements OnInit {
 
-  // private readonly API_BASE = 'https://mkxrivn8wy.eu-central-1.awsapprunner.com/api/storage';
-  private readonly API_BASE = 'http://localhost:5471/api/storage';
+  // Base URL is provided via Angular environments for dev/prod
+  private readonly API_BASE = environment.apiBase;
   dataSource: PeriodicElement[] = [];
   displayedColumns = ['location', 'name'];
 
