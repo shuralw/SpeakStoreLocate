@@ -1,11 +1,19 @@
 import { Component, NgZone, OnInit } from '@angular/core';
-import { AudioCache } from './audio-cache';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
+import { AudioCache } from './audio-cache';
 
 export interface PeriodicElement {
   location: string;
   name: string;
+}
+
+export interface PendingUpload {
+  id: string;
+  blob: Blob;
+  duration: number;
+  isUploading: boolean;
+  audioUrl?: string;
 }
 
 @Component({
@@ -30,6 +38,9 @@ export class AudioRecorderComponent implements OnInit {
   private audioChunks: BlobPart[] = [];
   private stream?: MediaStream;
 
+  pendingUploads: PendingUpload[] = [];
+  currentlyPlaying?: string;
+
   constructor(private http: HttpClient, private zone: NgZone) {}
 
   async ngOnInit() {
@@ -40,7 +51,7 @@ export class AudioRecorderComponent implements OnInit {
     });
   }
 
-  async onPointerDown(evt: PointerEvent, btn: HTMLElement) {
+  async onPointerDown(evt: PointerEvent, btn: any) {
     evt.preventDefault();
 
     // immer frisch holen, um leere Blobs zu vermeiden
@@ -58,7 +69,7 @@ export class AudioRecorderComponent implements OnInit {
     this.zone.run(() => this.isRecording = true);
   }
 
-  onPointerUp(evt: PointerEvent, btn: HTMLElement) {
+  onPointerUp(evt: PointerEvent, btn: any) {
     // nur wenn wir aufnehmen
     if (!this.mediaRecorder || this.mediaRecorder.state !== 'recording') {
       return;
@@ -71,10 +82,9 @@ export class AudioRecorderComponent implements OnInit {
     this.zone.run(() => this.isRecording = false);
   }
 
-  onPointerCancel(evt: PointerEvent, btn: HTMLElement) {
+  onPointerCancel(evt: PointerEvent, btn: any) {
     if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
       btn.releasePointerCapture(evt.pointerId);
-      this.mediaRecorder.stop();
     }
     this.audioChunks = [];
     this.zone.run(() => this.isRecording = false);
@@ -88,39 +98,152 @@ export class AudioRecorderComponent implements OnInit {
     this.stream?.getTracks().forEach(t => t.stop());
     this.stream = undefined;
 
-    // Debug: console.log('Blob size:', blob.size);
-    let result = await this.uploadAudio(blob);
+    // Audio-Dauer ermitteln
+    const duration = await this.getAudioDuration(blob);
+    
+    // Zu Pending-Liste hinzufügen
+    const upload: PendingUpload = {
+      id: Date.now().toString(),
+      blob,
+      duration,
+      isUploading: false,
+      audioUrl: URL.createObjectURL(blob)
+    };
+    
+    this.zone.run(() => {
+      this.pendingUploads.push(upload);
+    });
+
+    // Upload starten
+    await this.uploadAudio(upload);
   }
 
-    private async uploadAudio(blob: Blob, isRetry = false): Promise<void> {
-      const form = new FormData();
-      form.append('audioFile', blob, 'recording.webm');
+  private async uploadAudio(uploadOrBlob: PendingUpload | Blob, isRetry = false): Promise<void> {
+    let upload: PendingUpload;
+    
+    if (uploadOrBlob instanceof Blob) {
+      // Create temporary upload object for cached blobs
+      const duration = await this.getAudioDuration(uploadOrBlob);
+      upload = {
+        id: Date.now().toString(),
+        blob: uploadOrBlob,
+        duration,
+        isUploading: false,
+        audioUrl: URL.createObjectURL(uploadOrBlob)
+      };
+      
+      this.zone.run(() => {
+        this.pendingUploads.push(upload);
+      });
+    } else {
+      upload = uploadOrBlob;
+    }
 
-      try {
-        // Wir erwarten jetzt ein JSON-Array von Strings vom Server
-        const results = await firstValueFrom(
-          this.http.post<string[]>(`${this.API_BASE}/upload-audio`, form)
-        );
+    const form = new FormData();
+    form.append('audioFile', upload.blob, 'recording.webm');
 
-        // Für jedes Resultat eine Meldung anzeigen
-        for (const res of results) {
-          this.showResult(true, `Erfolgreich gespeichert: ${res}`);
-          // Warten bis das Popup wieder verschwindet, bevor wir das nächste anzeigen
-          await new Promise(resolve => setTimeout(resolve, 5500));
+    // Upload als "uploading" markieren
+    this.zone.run(() => {
+      upload.isUploading = true;
+    });
+
+    try {
+      const results = await firstValueFrom(
+        this.http.post<string[]>(`${this.API_BASE}/upload-audio`, form)
+      );
+
+      // Upload erfolgreich - aus Liste entfernen
+      this.zone.run(() => {
+        const index = this.pendingUploads.findIndex(p => p.id === upload.id);
+        if (index >= 0) {
+          // URL freigeben
+          if (this.pendingUploads[index].audioUrl) {
+            URL.revokeObjectURL(this.pendingUploads[index].audioUrl!);
+          }
+          this.pendingUploads.splice(index, 1);
         }
+      });
 
-        // Tabelle anschließend einmalig aktualisieren
-        this.dataSource = await this.getTableItems();
-      } catch {
-        if (!isRetry) {
-          await AudioCache.save(blob);
-          this.showResult(false, 'Offline: Audio wurde lokal gespeichert und wird später hochgeladen.');
-        } else {
-          this.showResult(false, 'Fehler beim Speichern!');
-        }
+      // Erfolgsmeldungen anzeigen
+      for (const res of results) {
+        this.showResult(true, `Erfolgreich gespeichert: ${res}`);
+        await new Promise(resolve => setTimeout(resolve, 5500));
+      }
+
+      // Tabelle aktualisieren
+      this.dataSource = await this.getTableItems();
+    } catch {
+      // Upload fehlgeschlagen
+      this.zone.run(() => {
+        upload.isUploading = false;
+      });
+
+      if (!isRetry) {
+        await AudioCache.save(upload.blob);
+        this.showResult(false, 'Offline: Audio wurde lokal gespeichert und wird später hochgeladen.');
+      } else {
+        this.showResult(false, 'Fehler beim Speichern!');
       }
     }
-  
+  }
+
+  private async getAudioDuration(blob: Blob): Promise<number> {
+    return new Promise((resolve) => {
+      const audio = new Audio();
+      audio.src = URL.createObjectURL(blob);
+      audio.addEventListener('loadedmetadata', () => {
+        URL.revokeObjectURL(audio.src);
+        resolve(audio.duration);
+      });
+      audio.addEventListener('error', () => {
+        URL.revokeObjectURL(audio.src);
+        resolve(0);
+      });
+    });
+  }
+
+  playAudio(upload: PendingUpload) {
+    if (this.currentlyPlaying === upload.id) {
+      // Stop current audio
+      this.currentlyPlaying = undefined;
+      return;
+    }
+
+    if (upload.audioUrl) {
+      const audio = new Audio(upload.audioUrl);
+      this.currentlyPlaying = upload.id;
+      
+      audio.addEventListener('ended', () => {
+        this.zone.run(() => {
+          this.currentlyPlaying = undefined;
+        });
+      });
+      
+      audio.play();
+    }
+  }
+
+  retryUpload(upload: PendingUpload) {
+    if (!upload.isUploading) {
+      this.uploadAudio(upload, true);
+    }
+  }
+
+  removeUpload(upload: PendingUpload) {
+    const index = this.pendingUploads.findIndex(p => p.id === upload.id);
+    if (index >= 0) {
+      if (upload.audioUrl) {
+        URL.revokeObjectURL(upload.audioUrl);
+      }
+      this.pendingUploads.splice(index, 1);
+    }
+  }
+
+  formatDuration(seconds: number): string {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
 
   private showResult(success: boolean, message: string) {
     this.zone.run(() => {
