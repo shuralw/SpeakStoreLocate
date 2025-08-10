@@ -35,7 +35,11 @@ public static class SerilogExtensions
     /// </summary>
     public static WebApplication UseSerilogRequestLogging(this WebApplication app)
     {
-        app.UseSerilogRequestLogging();
+        app.UseSerilogRequestLogging(options =>
+        {
+            // Optional: Customize the request logging options here
+            options.MessageTemplate = "Handled {RequestPath}";
+        });
         return app;
     }
 }

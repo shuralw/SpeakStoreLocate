@@ -4,9 +4,9 @@ namespace SpeakStoreLocate.ApiService.Options
 {
     public class OpenAIOptions
     {
-        public const string SectionName = "OpenAI";
+        public const string SectionName = "OPENAI";
 
-        public string ApiKey { get; set; } = string.Empty;
+        public string APIKEY { get; set; } = string.Empty;
 
         public string BaseUrl { get; set; } = "https://api.openai.com";
 
@@ -16,7 +16,7 @@ namespace SpeakStoreLocate.ApiService.Options
         
         public void Validate()
         {
-            if (string.IsNullOrWhiteSpace(ApiKey))
+            if (string.IsNullOrWhiteSpace(APIKEY))
                 throw new InvalidOperationException("OpenAI ApiKey is required");
             
             if (string.IsNullOrWhiteSpace(BaseUrl))

@@ -16,10 +16,17 @@ public static class ServiceConfigurationExtensions
             .Configure(options => configuration.GetSection(OpenAIOptions.SectionName).Bind(options))
             .PostConfigure(options =>
             {
-                // Environment variable override
+                // Environment variable override (only if environment variable is actually set)
                 var envApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-                if (!string.IsNullOrEmpty(envApiKey) || IsPlaceholder(options.ApiKey))
-                    options.ApiKey = envApiKey ?? string.Empty;
+                if (!string.IsNullOrEmpty(envApiKey))
+                {
+                    options.APIKEY = envApiKey;
+                }
+                else if (IsPlaceholder(options.APIKEY))
+                {
+                    // Only set to empty if it's still a placeholder and no env var is set
+                    options.APIKEY = string.Empty;
+                }
                 
                 var envBaseUrl = Environment.GetEnvironmentVariable("OPENAI_BASE_URL");
                 if (!string.IsNullOrEmpty(envBaseUrl))
