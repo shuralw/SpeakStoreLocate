@@ -32,6 +32,9 @@ public class Program
         builder.Services.AddControllers();
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();
+        
+        // 8. Health Checks for App Runner
+        builder.Services.AddHealthChecks();
 
         var app = builder.Build();
 
@@ -58,8 +61,11 @@ public static class PipelineExtensions
         // 3. CORS (must be before UseHttpsRedirection)
         app.UseCors("DefaultCorsPolicy");
 
-        // 4. HTTPS Redirection
-        app.UseHttpsRedirection();
+        // 4. HTTPS Redirection (only in Development, App Runner handles HTTPS)
+        if (app.Environment.IsDevelopment())
+        {
+            app.UseHttpsRedirection();
+        }
 
         // 5. Authorization
         app.UseAuthorization();
@@ -67,7 +73,10 @@ public static class PipelineExtensions
         // 6. .NET Aspire endpoints
         app.MapDefaultEndpoints();
 
-        // 7. API Controllers
+        // 7. Health Checks for App Runner
+        app.MapHealthChecks("/health");
+
+        // 8. API Controllers
         app.MapControllers();
 
         return app;

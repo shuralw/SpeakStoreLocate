@@ -1,0 +1,19 @@
+version: 1.0
+runtime: docker
+build:
+  commands:
+    build:
+      - echo "Build started on `date`"
+      - echo "Building Docker image"
+run:
+  runtime-version: latest
+  command: dotnet SpeakStoreLocate.ApiService.dll
+  network:
+    port: 8080
+    env: PORT
+  env:
+    - name: ASPNETCORE_ENVIRONMENT
+      value: Production
+    - name: ASPNETCORE_URLS
+      value: http://+:8080
+
