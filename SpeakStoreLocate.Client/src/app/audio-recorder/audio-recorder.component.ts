@@ -86,46 +86,86 @@ export class AudioRecorderComponent implements OnInit {
     }
   }
 
-  async onPointerDown(evt: PointerEvent, btn: any) {
+  async onPointerDown(evt: PointerEvent) {
+    console.log('[AudioRecorderComponent] onPointerDown', evt);
     evt.preventDefault();
 
     // immer frisch holen, um leere Blobs zu vermeiden
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
     // Pointer Capture auf den Button
-    btn.setPointerCapture(evt.pointerId);
+    const btn = evt.target as HTMLElement;
+    if (btn && typeof (btn as any).setPointerCapture === 'function') {
+      (btn as any).setPointerCapture(evt.pointerId);
+      console.debug('[AudioRecorderComponent] setPointerCapture called', btn, evt.pointerId);
+    } else {
+      console.warn('[AudioRecorderComponent] setPointerCapture not available on target:', btn);
+    }
 
     this.audioChunks = [];
     this.mediaRecorder = new MediaRecorder(this.stream);
-    this.mediaRecorder.ondataavailable = e => this.audioChunks.push(e.data);
-    this.mediaRecorder.onstop = () => this.onRecordingStop();
+    this.mediaRecorder.ondataavailable = e => {
+      console.log('[AudioRecorderComponent] ondataavailable', e);
+      this.audioChunks.push(e.data);
+    };
+    this.mediaRecorder.onstop = () => {
+      console.log('[AudioRecorderComponent] mediaRecorder.onstop');
+      this.onRecordingStop();
+    };
     this.mediaRecorder.start();
+    console.log('[AudioRecorderComponent] mediaRecorder started');
 
     this.zone.run(() => this.isRecording = true);
   }
 
-  onPointerUp(evt: PointerEvent, btn: any) {
+  onPointerUp(evt: PointerEvent) {
+    console.log('[AudioRecorderComponent] onPointerUp', evt);
     // nur wenn wir aufnehmen
     if (!this.mediaRecorder || this.mediaRecorder.state !== 'recording') {
       return;
     }
 
     // Pointer Capture lösen
-    btn.releasePointerCapture(evt.pointerId);
+    const btn = evt.target as HTMLElement;
+    if (btn && typeof (btn as any).releasePointerCapture === 'function') {
+      (btn as any).releasePointerCapture(evt.pointerId);
+      console.debug('[AudioRecorderComponent] releasePointerCapture called', btn, evt.pointerId);
+    } else {
+      console.warn('[AudioRecorderComponent] releasePointerCapture not available on target:', btn);
+    }
 
     this.mediaRecorder.stop();
+    console.log('[AudioRecorderComponent] mediaRecorder stopped');
     this.zone.run(() => this.isRecording = false);
   }
 
-  onPointerCancel(evt: PointerEvent, btn: any) {
+  onPointerCancel(evt: PointerEvent) {
+    console.log('[AudioRecorderComponent] onPointerCancel', evt);
     if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
       // Pointer Capture lösen und Aufnahme sauber beenden,
       // damit onRecordingStop() den Blob bauen und den Upload anstoßen kann
-      btn.releasePointerCapture(evt.pointerId);
+      const btn = evt.target as HTMLElement;
+      if (btn && typeof (btn as any).releasePointerCapture === 'function') {
+        (btn as any).releasePointerCapture(evt.pointerId);
+        console.debug('[AudioRecorderComponent] releasePointerCapture called (cancel)', btn, evt.pointerId);
+      } else {
+        console.warn('[AudioRecorderComponent] releasePointerCapture not available on target (cancel):', btn);
+      }
       this.mediaRecorder.stop();
+      console.log('[AudioRecorderComponent] mediaRecorder stopped (cancel)');
     }
     // audioChunks NICHT leeren – sie werden in onRecordingStop() benötigt
     this.zone.run(() => this.isRecording = false);
+  }
+  // Debug: Mouse events for troubleshooting
+  onMouseDown(evt: MouseEvent) {
+    console.log('[AudioRecorderComponent] onMouseDown', evt);
+  }
+  onMouseUp(evt: MouseEvent) {
+    console.log('[AudioRecorderComponent] onMouseUp', evt);
+  }
+  onMouseLeave(evt: MouseEvent) {
+    console.log('[AudioRecorderComponent] onMouseLeave', evt);
   }
 
   private async onRecordingStop() {
@@ -198,7 +238,13 @@ export class AudioRecorderComponent implements OnInit {
       });
 
       if (!isRetry) {
-        await AudioCache.save(upload.blob);
+        console.log('[AudioRecorderComponent] Saving blob to AudioCache:', upload.blob);
+        try {
+          await AudioCache.save(upload.blob);
+          console.info('[AudioRecorderComponent] Blob saved to AudioCache.');
+        } catch (err) {
+          console.error('[AudioRecorderComponent] Error saving blob to AudioCache:', err);
+        }
         this.showResult(false, 'Offline: Audio wurde lokal gespeichert und wird später hochgeladen.');
       } else {
         this.showResult(false, 'Fehler beim Upload!');
@@ -221,12 +267,23 @@ export class AudioRecorderComponent implements OnInit {
     return new Promise((resolve) => {
       const audio = new Audio();
       audio.src = URL.createObjectURL(blob);
-      audio.addEventListener('loadedmetadata', () => {
+
+      const cleanup = () => {
         URL.revokeObjectURL(audio.src);
-        resolve(audio.duration);
-      });
+        audio.remove();
+      };
+
+      const resolveIfReady = () => {
+        if (isFinite(audio.duration) && !isNaN(audio.duration) && audio.duration > 0) {
+          cleanup();
+          resolve(audio.duration);
+        }
+      };
+
+      audio.addEventListener('loadedmetadata', resolveIfReady);
+      audio.addEventListener('durationchange', resolveIfReady);
       audio.addEventListener('error', () => {
-        URL.revokeObjectURL(audio.src);
+        cleanup();
         resolve(0);
       });
     });

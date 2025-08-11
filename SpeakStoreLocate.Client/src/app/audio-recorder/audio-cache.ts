@@ -11,16 +11,29 @@ export class AudioCache {
   private static storeName = 'audio-blobs';
 
   static async save(blob: Blob) {
+    console.log('[AudioCache.save] Attempting to save blob:', blob);
     const db = await this.open();
     const tx = db.transaction(this.storeName, 'readwrite');
     const store = tx.objectStore(this.storeName);
     await new Promise<void>((resolve, reject) => {
       const req = store.add({ blob, timestamp: Date.now() });
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+      req.onsuccess = () => {
+        console.info('[AudioCache.save] Blob saved successfully.');
+        resolve();
+      };
+      req.onerror = () => {
+        console.error('[AudioCache.save] Error saving blob:', req.error);
+        reject(req.error);
+      };
     });
-    tx.oncomplete = () => db.close();
-    tx.onerror = () => db.close();
+    tx.oncomplete = () => {
+      console.log('[AudioCache.save] Transaction complete, closing DB.');
+      db.close();
+    };
+    tx.onerror = () => {
+      console.error('[AudioCache.save] Transaction error, closing DB.');
+      db.close();
+    };
   }
 
   static async uploadAll(uploadFn: (blob: Blob) => Promise<void>) {
