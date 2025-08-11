@@ -66,12 +66,12 @@
             mat-fab
             [color]="isRecording ? 'warn' : 'primary'"
             class="record-button"
-            (pointerdown)="onPointerDown($event, $event.target)"
-            (pointerup)="onPointerUp($event, $event.target)"
-            #recordBtn
-            (pointerdown)="onPointerDown($event, recordBtn)"
-            (pointerup)="onPointerUp($event, recordBtn)"
-            (pointercancel)="onPointerCancel($event, recordBtn)">
+            (pointerdown)="onPointerDown($event)"
+            (pointerup)="onPointerUp($event)"
+            (pointercancel)="onPointerCancel($event)"
+            (mousedown)="onMouseDown($event)"
+            (mouseup)="onMouseUp($event)"
+            (mouseleave)="onMouseLeave($event)">
             <mat-icon>{{isRecording ? 'stop' : 'mic'}}</mat-icon>
           </button>
           <div class="recording-status" *ngIf="isRecording">
