@@ -4,5 +4,5 @@ namespace SpeakStoreLocate.ApiService.Services.Interpretation;
 
 public  interface IInterpretationService
 {
-    public Task<List<StorageCommand>> InterpretGeschwafelToStructuredCommands(string transcriptedText);
+     Task<List<StorageCommand>> InterpretGeschwafelToStructuredCommands(string transcriptedText);
 }

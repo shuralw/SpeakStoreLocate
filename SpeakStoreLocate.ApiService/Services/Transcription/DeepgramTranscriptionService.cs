@@ -47,7 +47,8 @@ public class DeepgramTranscriptionService : ITranscriptionService
                 });
 
             _logger.LogInformation("Deepgram transcription completed for local processing");
-            return response?.Results?.Channels?.FirstOrDefault()?.Alternatives?.FirstOrDefault()?.Transcript ?? string.Empty;
+            return response?.Results?.Channels?.FirstOrDefault()?.Alternatives?.FirstOrDefault()?.Transcript ??
+                   string.Empty;
         }
         catch (Exception ex)
         {
@@ -89,10 +90,11 @@ public class DeepgramTranscriptionService : ITranscriptionService
                 );
 
             // 2. Alle Kanal-Transkripte zu einem Gesamtstring verbinden
-            string transcriptText = string.Join(" ", bestTranscriptionPerChannel);
+            string transcriptedText = string.Join(" ", bestTranscriptionPerChannel);
 
-            _logger.LogInformation("Deepgram transcription completed successfully");
-            return transcriptText;
+            _logger.LogInformation("Transkript generiert:{transcriptedText}", transcriptedText);
+
+            return transcriptedText;
         }
         catch (Exception ex)
         {

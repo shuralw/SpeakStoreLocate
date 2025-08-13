@@ -18,12 +18,12 @@ public static class ApplicationServicesExtensions
     {
         // External clients
         services.AddHttpClient();
-        
+
         // OpenAI Client with proper configuration
         services.AddSingleton(serviceProvider =>
         {
             var options = serviceProvider.GetRequiredService<IOptions<OpenAIOptions>>().Value;
-            
+
             if (string.IsNullOrWhiteSpace(options.APIKEY))
                 throw new InvalidOperationException("OpenAI:ApiKey is not configured!");
 
@@ -47,7 +47,8 @@ public static class ApplicationServicesExtensions
         services.AddScoped<IStorageRepository, AwsStorageRepository>();
         services.AddScoped<IChatCompletionService, OpenAiChatCompletionService>();
         services.AddScoped<IInterpretationService, InterpretationService>();
-
+        services.AddScoped<ITranscriptionImprover, TranscriptionImprover>();
+        
         return services;
     }
 }

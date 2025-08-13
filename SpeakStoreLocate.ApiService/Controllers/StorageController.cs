@@ -22,12 +22,14 @@ public class StorageController : ControllerBase
     private readonly ITranscriptionService transcriptionService;
     private readonly IStorageRepository _storageRepository;
     private readonly IInterpretationService _interpretationService;
+    private readonly ITranscriptionImprover _transcriptionImprover;
 
 
     public StorageController(IConfiguration configuration,
         ITranscriptionService transcriptionService,
         IStorageRepository storageRepository,
         IInterpretationService interpretationService,
+        ITranscriptionImprover transcriptionImprover,
         ILogger<StorageController> logger)
     {
         _logger = logger;
@@ -35,6 +37,7 @@ public class StorageController : ControllerBase
         this.transcriptionService = transcriptionService;
         _storageRepository = storageRepository;
         _interpretationService = interpretationService;
+        _transcriptionImprover = transcriptionImprover;
     }
 
     [HttpGet]
@@ -89,15 +92,69 @@ public class StorageController : ControllerBase
     {
         var origin = Request.Headers.Origin.FirstOrDefault();
         _logger.LogInformation("UploadAudio called from origin: {Origin}", origin ?? "(null)");
+
+        // Edge Case Validierungen
+        if (request?.AudioFile == null)
+        {
+            _logger.LogWarning("Audio upload failed: No file provided");
+            return BadRequest(new { error = "No audio file provided" });
+        }
+
+        if (request.AudioFile.Length == 0)
+        {
+            _logger.LogWarning("Audio upload failed: Empty file provided (Length: 0)");
+            return BadRequest(new { error = "Audio file is empty" });
+        }
+
+        // Prüfe auf gültige Audio-Dateiformate
+        var allowedContentTypes = new[]
+        {
+            "audio/mpeg", "audio/mp3", "audio/wav", "audio/m4a", 
+            "audio/aac", "audio/ogg", "audio/webm", "audio/flac"
+        };
         
-        var transcriptedText = await transcriptionService.TranscriptAudioAsync(request);
+        if (!allowedContentTypes.Contains(request.AudioFile.ContentType?.ToLowerInvariant()))
+        {
+            _logger.LogWarning("Audio upload failed: Invalid content type {ContentType}", request.AudioFile.ContentType);
+            return BadRequest(new { error = $"Unsupported audio format. Allowed formats: {string.Join(", ", allowedContentTypes)}" });
+        }
 
-        _logger.LogInformation("Transkript generiert:{transcriptedText}", transcriptedText);
+        // Prüfe Dateigröße (z.B. max 50MB)
+        const long maxFileSize = 50 * 1024 * 1024; // 50MB
+        if (request.AudioFile.Length > maxFileSize)
+        {
+            _logger.LogWarning("Audio upload failed: File too large ({Size} bytes)", request.AudioFile.Length);
+            return BadRequest(new { error = $"File too large. Maximum size allowed: {maxFileSize / (1024 * 1024)}MB" });
+        }
 
-        var commands = await this._interpretationService.InterpretGeschwafelToStructuredCommands(transcriptedText);
+        try
+        {
+            var transcriptedText = await transcriptionService.TranscriptAudioAsync(request);
+            
+            var improvedTranscriptedText = await _transcriptionImprover.ImproveTranscriptedText(transcriptedText);
 
-        var performedActions = await _storageRepository.PerformActions(commands);
+            var commands = await this._interpretationService.InterpretGeschwafelToStructuredCommands(improvedTranscriptedText);
 
-        return Ok(performedActions);
+            var performedActions = await _storageRepository.PerformActions(commands);
+
+            return Ok(performedActions);
+        }
+        catch (ArgumentException ex)
+        {
+            // Edge Cases aus InterpretationService: leere/bedeutungslose Transkription oder keine gültigen Kommandos
+            _logger.LogWarning(ex, "Invalid transcription or no valid commands found");
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            // AI Service Probleme (ungültiges JSON Response)
+            _logger.LogError(ex, "AI service error during interpretation");
+            return StatusCode(500, new { error = "Error interpreting audio content" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing audio upload");
+            return StatusCode(500, new { error = "Internal server error while processing audio" });
+        }
     }
 }

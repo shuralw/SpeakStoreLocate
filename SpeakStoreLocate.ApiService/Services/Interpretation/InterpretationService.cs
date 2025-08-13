@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.Json;
 using SpeakStoreLocate.ApiService.Models;
 using SpeakStoreLocate.ApiService.Services.ChatCompletion;
@@ -48,6 +47,11 @@ class InterpretationService(ILogger<InterpretationService> _logger, IChatComplet
             • source        – die Quelllokation (optional, nur bei PUT mandatory) 
             • destination   – die Ziellokation (optional - bleibt leer bei GET)  
 
+            **WICHTIG: Edge Cases behandeln:**
+            - Wenn der Text keine erkennbaren Lager-Aktionen enthält, gib ein leeres Array zurück: []
+            - Wenn der Text zu kurz oder bedeutungslos ist, gib ein leeres Array zurück: []
+            - Ignoriere reine Füllwörter, Pausen, oder unverständliche Laute
+
             **Regeln für die Methodenwahl:**  
             1. **PUT**  nur wenn **im selben Satz**  
                 - eine **Quelllokation** (z.B. „von Regal A“)  
@@ -68,8 +72,9 @@ class InterpretationService(ILogger<InterpretationService> _logger, IChatComplet
                 - Falls du offensichtliche Rechtschreibfehler erkennst, die der Transkriptor erzeugt haben könnte, korrigiere diese. Das kommt aber relativ selten vor.
                 - Filler‑Wörter: Entferne Artikel (der, die, das) und Füllwörter, aber nur soweit, dass der eigentliche Artikelname klar bleibt.    
 
-            **Beispiel-Ausgabe** für deinen Text:
-                >„Und das Fahrrad wird an der Wand aufgehangen.“
+            **Beispiel-Ausgaben:**
+            
+            Für: ""Und das Fahrrad wird an der Wand aufgehangen.""
                 [
                     {
                         ""method"":   ""POST"",
@@ -78,8 +83,8 @@ class InterpretationService(ILogger<InterpretationService> _logger, IChatComplet
                         ""destination"": ""Wand""
                     }
                 ]
-            Und für
-                >„Verschiebe die Lampe von Regal A nach Regal B.“
+            
+            Für: ""Verschiebe die Lampe von Regal A nach Regal B.""
                 [
                     {
                         ""method"":   ""PUT"",
@@ -88,11 +93,21 @@ class InterpretationService(ILogger<InterpretationService> _logger, IChatComplet
                         ""source"":   ""Regal A"",
                         ""destination"": ""Regal B""
                     }
-                ]";
+                ]
 
+            Für bedeutungslose Texte: []
+
+            **WICHTIG:** Wenn du unsicher bist oder der Text keine klaren Lager-Aktionen enthält, gib lieber ein leeres Array [] zurück als ungültige Kommandos zu erfinden!";
 
     public async Task<List<StorageCommand>> InterpretGeschwafelToStructuredCommands(string transcriptedText)
     {
+        // Edge Case 1: Leere oder bedeutungslose Transkription
+        if (string.IsNullOrWhiteSpace(transcriptedText))
+        {
+            _logger.LogWarning("Empty or null transcription received");
+            throw new ArgumentException("Transcription is empty or contains no meaningful content");
+        }
+
         // Kompletten Prompt zusammenfügen und absenden
         string fullPrompt = $"System: {systemPrompt}\n" +
                             $"User: {transcriptedText}";
@@ -101,46 +116,47 @@ class InterpretationService(ILogger<InterpretationService> _logger, IChatComplet
 
         string chatResponse = await _chatCompletionService.CompleteChat(fullPrompt);
 
-        // 6) In List<StorageCommand> deserialisieren
-        var commands = JsonSerializer.Deserialize<List<StorageCommand>>(
-            chatResponse,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-        ) ?? new List<StorageCommand>();
-        return commands;
-    }
-}
-
-class SearchRequestStringifier : ISearchRequestStringifier
-{
-    public string Stringify(StorageCommand searchCommand)
-    {
-        return searchCommand.ItemName;
-    }
-}
-
-internal interface ISearchRequestStringifier
-{
-    string Stringify(StorageCommand searchCommand);
-}
-
-internal interface ISearchCommandGeneration
-{
-    string GenerateSearchCommand(IEnumerable<StorageCommand> searchRequests);
-}
-
-class SearchCommandGeneration : ISearchCommandGeneration
-{
-    public string GenerateSearchCommand(IEnumerable<StorageCommand> searchRequests)
-    {
-        StringBuilder result = new StringBuilder();
-
-        string systemPrompt =
-            "Du bist ein Kommissionierungssystem für ein Lager, das für den User herausfindet, wo sich Objekte befinden. Du lieferst ";
-        foreach (var searchRequest in searchRequests)
+        // Edge Case 4: Überprüfe ob die AI-Antwort gültiges JSON ist
+        List<StorageCommand> commands;
+        try
         {
-            result.Append(searchRequest.ItemName);
+            commands = JsonSerializer.Deserialize<List<StorageCommand>>(
+                chatResponse,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+            ) ?? new List<StorageCommand>();
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to parse AI response as JSON: {Response}", chatResponse);
+            throw new InvalidOperationException("AI service returned invalid response format");
         }
 
-        return result.ToString();
+        // Edge Case 5: Keine gültigen Kommandos gefunden
+        if (commands.Count == 0)
+        {
+            _logger.LogWarning("No storage commands found in transcription: '{Text}'", transcriptedText);
+            throw new ArgumentException("No valid storage commands found in the provided text");
+        }
+
+        // Edge Case 6: Validiere dass die Kommandos gültige Daten enthalten
+        var validCommands = commands.Where(cmd =>
+            !string.IsNullOrWhiteSpace(cmd.ItemName) &&
+            !string.IsNullOrWhiteSpace(cmd.Method) &&
+            cmd.Count > 0
+        ).ToList();
+
+        if (validCommands.Count == 0)
+        {
+            _logger.LogWarning("All parsed commands are invalid: {Commands}", JsonSerializer.Serialize(commands));
+            throw new ArgumentException("All parsed commands contain invalid data");
+        }
+
+        if (validCommands.Count != commands.Count)
+        {
+            _logger.LogInformation("Filtered out {InvalidCount} invalid commands from {TotalCount} total commands",
+                commands.Count - validCommands.Count, commands.Count);
+        }
+
+        return validCommands;
     }
 }
