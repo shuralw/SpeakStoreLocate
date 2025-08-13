@@ -1,10 +1,12 @@
 using Amazon.S3;
 using Deepgram;
+using Deepgram.Logger;
 using Deepgram.Clients.Interfaces.v1;
 using Deepgram.Models.Listen.v1.REST;
 using Microsoft.Extensions.Options;
 using SpeakStoreLocate.ApiService.Models;
 using SpeakStoreLocate.ApiService.Options;
+using LogLevel = Deepgram.Logger.LogLevel;
 
 namespace SpeakStoreLocate.ApiService.Services.Transcription;
 
@@ -21,6 +23,8 @@ public class DeepgramTranscriptionService : ITranscriptionService
         IOptions<AmazonS3Options> s3Options,
         ILogger<DeepgramTranscriptionService> logger)
     {
+        // Deaktiviere Deepgram's internes Logging komplett
+        Library.Initialize(LogLevel.Warning); // for real deepgram ?! Frigging hell, why is this so complicated?
         _deepgramClient = ClientFactory.CreateListenRESTClient(deepgramOptions.Value.ApiKey);
         _s3Client = s3Client;
         _s3Options = s3Options.Value;
