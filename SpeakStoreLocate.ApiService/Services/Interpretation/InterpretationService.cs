@@ -43,37 +43,37 @@ class InterpretationService(ILogger<InterpretationService> _logger, IChatComplet
 
             • method        – eine der Zeichenketten ""GET"", ""DELETE"", ""POST"" oder ""PUT""  
             • count         – eine Ganzzahl (1,2,3…)  
-            • itemName      – der exakte Artikelname (inkl. Groß‑/Kleinschreibung wie im Transkript)  
-            • source        – die Quelllokation (optional, nur bei PUT mandatory) 
-            • destination   – die Ziellokation (optional - bleibt leer bei GET)  
+            • itemName      – der exakte Artikelname (inkl. Groß‑/Kleinschreibung wie im Transkript)
+            • source        – die Quelllokation (optional, nur bei PUT mandatory)
+            • destination   – die Ziellokation (optional - bleibt leer bei GET)
 
             **WICHTIG: Edge Cases behandeln:**
             - Wenn der Text keine erkennbaren Lager-Aktionen enthält, gib ein leeres Array zurück: []
             - Wenn der Text zu kurz oder bedeutungslos ist, gib ein leeres Array zurück: []
             - Ignoriere reine Füllwörter, Pausen, oder unverständliche Laute
 
-            **Regeln für die Methodenwahl:**  
-            1. **PUT**  nur wenn **im selben Satz**  
-                - eine **Quelllokation** (z.B. „von Regal A“)  
-                - **und** eine **Ziellokation** (z.B. „nach Regal B“) explizit genannt werden.  
-            2. **DELETE** wenn der User etwas „entnimmt“, „ausschüttet“, „herausnimmt“ o.Ä.  
-            3. **GET**    wenn der User nach dem Ort fragt („wo ist…“, „suche…“).    
-            4. **POST**  in **allen anderen Fällen**, also  
-                - „einlagern“, „ablegen“, „in … tun“, „hängen“, „befestigen“, „stellen“,  
-                - oder wenn nur eine Lokation angegeben ist ohne Quelle.  
+            **Regeln für die Methodenwahl:**
+            1. **PUT**  nur wenn **im selben Satz**
+                - eine **Quelllokation** (z.B. „von Regal A“)
+                - **und** eine **Ziellokation** (z.B. „nach Regal B“) explizit genannt werden.
+            2. **DELETE** wenn der User etwas „entnimmt“, „ausschüttet“, „herausnimmt“ o.Ä.
+            3. **GET**    wenn der User nach dem Ort fragt („wo ist…“, „suche…“).
+            4. **POST**  in **allen anderen Fällen**, also
+                - „einlagern“, „ablegen“, „in … tun“, „hängen“, „befestigen“, „stellen“,
+                - oder wenn nur eine Lokation angegeben ist ohne Quelle.
 
-            **Weiteres Optimierungspotenzial:**  
-                - Füge bei PUT‑Befehlen das Feld `""source""` hinzu, um die Quell‑Lokation zu speichern.  
-                - Gib immer `""count"": 1`, wenn keine Zahl genannt wird.  
-                - Ersetze ausgeschriebene Zahlen („drei“) durch Ziffern (3).  
-                - Normalisiere Leer‑ und Sonderzeichen (Trim, keine führenden/trailenden Leerzeichen).  
-                - Wenn ein Satz kein valides Kommando enthält, ignoriere ihn schlicht.  
+            **Weiteres Optimierungspotenzial:**
+                - Füge bei PUT‑Befehlen das Feld `""source""` hinzu, um die Quell‑Lokation zu speichern.
+                - Gib immer `""count"": 1`, wenn keine Zahl genannt wird.
+                - Ersetze ausgeschriebene Zahlen („drei“) durch Ziffern (3).
+                - Normalisiere Leer‑ und Sonderzeichen (Trim, keine führenden/trailenden Leerzeichen).
+                - Wenn ein Satz kein valides Kommando enthält, ignoriere ihn schlicht.
                 - Bei Suchen soll der Itemname gesetzt werden, der Ort wird allerdings nicht identifiziert und bleibt leer.
                 - Falls du offensichtliche Rechtschreibfehler erkennst, die der Transkriptor erzeugt haben könnte, korrigiere diese. Das kommt aber relativ selten vor.
-                - Filler‑Wörter: Entferne Artikel (der, die, das) und Füllwörter, aber nur soweit, dass der eigentliche Artikelname klar bleibt.    
+                - Filler‑Wörter: Entferne Artikel (der, die, das) und Füllwörter, aber nur soweit, dass der eigentliche Artikelname klar bleibt.
 
             **Beispiel-Ausgaben:**
-            
+
             Für: ""Und das Fahrrad wird an der Wand aufgehangen.""
                 [
                     {
@@ -83,7 +83,7 @@ class InterpretationService(ILogger<InterpretationService> _logger, IChatComplet
                         ""destination"": ""Wand""
                     }
                 ]
-            
+
             Für: ""Verschiebe die Lampe von Regal A nach Regal B.""
                 [
                     {

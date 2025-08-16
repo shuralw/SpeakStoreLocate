@@ -10,5 +10,7 @@ public class StorageCommand
 
     [JsonPropertyName("itemName")] public string ItemName { get; set; }
 
+    [JsonPropertyName("source")] public string? Source { get; set; } // neu
+
     [JsonPropertyName("destination")] public string Destination { get; set; }
 }

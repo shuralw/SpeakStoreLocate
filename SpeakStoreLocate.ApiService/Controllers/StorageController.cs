@@ -131,9 +131,9 @@ public class StorageController : ControllerBase
         {
             var transcriptedText = await transcriptionService.TranscriptAudioAsync(request);
             
-            var improvedTranscriptedText = await _transcriptionImprover.ImproveTranscriptedText(transcriptedText);
+            // var improvedTranscriptedText = await _transcriptionImprover.ImproveTranscriptedText(transcriptedText);
 
-            var commands = await this._interpretationService.InterpretGeschwafelToStructuredCommands(improvedTranscriptedText);
+            var commands = await this._interpretationService.InterpretGeschwafelToStructuredCommands(transcriptedText);
 
             var performedActions = await _storageRepository.PerformActions(commands);
 
