@@ -62,7 +62,7 @@ public class StorageController : ControllerBase
         }
 
         Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-Id");
 
         return await this._storageRepository.GetStorageItems();
     }
@@ -77,7 +77,7 @@ public class StorageController : ControllerBase
         // Manually set CORS headers for preflight
         Response.Headers.Add("Access-Control-Allow-Origin", origin ?? "*");
         Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+        Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-User-Id");
         Response.Headers.Add("Access-Control-Max-Age", "3600");
 
         return Ok();

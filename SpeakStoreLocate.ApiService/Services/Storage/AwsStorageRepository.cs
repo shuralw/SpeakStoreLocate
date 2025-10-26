@@ -3,6 +3,7 @@ using Amazon.DynamoDBv2.DocumentModel;
 using Microsoft.CodeAnalysis;
 using SpeakStoreLocate.ApiService.Models;
 using SpeakStoreLocate.ApiService.Utils;
+using SpeakStoreLocate.ApiService.Middleware;
 
 namespace SpeakStoreLocate.ApiService.Services.Storage;
 
@@ -10,18 +11,24 @@ public class AwsStorageRepository : IStorageRepository
 {
     private readonly ILogger<AwsStorageRepository> _logger;
     private readonly IDynamoDBContext _dbContext;
+    private readonly IUserContext _userContext;
 
     public AwsStorageRepository(
         ILogger<AwsStorageRepository> logger,
-        IDynamoDBContext dbContext)
+        IDynamoDBContext dbContext,
+        IUserContext userContext)
     {
         this._dbContext = dbContext;
         _logger = logger;
+        _userContext = userContext;
     }
 
     public async Task<IEnumerable<StorageItem>> GetStorageItems()
     {
-        var conditions = new List<ScanCondition>();
+        var conditions = new List<ScanCondition>
+        {
+            new ScanCondition("UserId", ScanOperator.Equal, _userContext.UserId)
+        };
         var results = await _dbContext.ScanAsync<StorageItem>(conditions).GetRemainingAsync();
 
         return results;
@@ -99,7 +106,8 @@ public class AwsStorageRepository : IStorageRepository
                     Id = Guid.NewGuid().ToString(),
                     Name = cmd.ItemName,
                     Location = cmd.Destination,
-                    NormalizedName = cmd.ItemName.NormalizeForSearch()
+                    NormalizedName = cmd.ItemName.NormalizeForSearch(),
+                    UserId = _userContext.UserId
                 };
 
                 await _dbContext.SaveAsync(storageItem);
@@ -119,7 +127,10 @@ public class AwsStorageRepository : IStorageRepository
     public async Task<IEnumerable<string>> GetStorageLocations()
     {
         var storageItems = await _dbContext
-            .ScanAsync<StorageItem>([])
+            .ScanAsync<StorageItem>(new List<ScanCondition>
+            {
+                new ScanCondition("UserId", ScanOperator.Equal, _userContext.UserId)
+            })
             .GetRemainingAsync();
 
         var distinctLocations = storageItems
@@ -139,6 +150,7 @@ public class AwsStorageRepository : IStorageRepository
         _logger.LogDebug("normalizedQuery: {normalizedQuery}", normalizedQuery);
         var conditions = new List<ScanCondition>
         {
+            new ScanCondition("UserId", ScanOperator.Equal, _userContext.UserId),
             new ScanCondition("NormalizedName", ScanOperator.Contains, normalizedQuery)
         };
 

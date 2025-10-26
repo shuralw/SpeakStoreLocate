@@ -2,6 +2,7 @@ using System.Configuration;
 using SpeakStoreLocate.ApiService.Extensions;
 using SpeakStoreLocate.ApiService.Options;
 using SpeakStoreLocate.ServiceDefaults;
+using SpeakStoreLocate.ApiService.Middleware;
 
 namespace SpeakStoreLocate.ApiService;
 
@@ -26,6 +27,9 @@ public class Program
         builder.Services.AddExternalServiceConfiguration(builder.Configuration);
         builder.Services.AddAwsConfiguration(builder.Configuration);
 
+        // Scoped User Context
+        builder.Services.AddScoped<IUserContext, UserContext>();
+
         // 3. CORS Configuration
         builder.Services.AddCorsConfiguration(builder.Configuration, builder.Environment);
 
@@ -42,9 +46,6 @@ public class Program
         builder.Services.AddControllers();
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();
-        
-        // 8. Health Checks for App Runner
-        builder.Services.AddHealthChecks();
 
         var app = builder.Build();
 
@@ -71,22 +72,19 @@ public static class PipelineExtensions
         // 3. CORS (must be before UseHttpsRedirection)
         app.UseCors("DefaultCorsPolicy");
 
-        // 4. HTTPS Redirection (only in Development, App Runner handles HTTPS)
-        if (app.Environment.IsDevelopment())
-        {
-            app.UseHttpsRedirection();
-        }
+        // 4. HTTPS Redirection
+        app.UseHttpsRedirection();
 
         // 5. Authorization
         app.UseAuthorization();
 
+        // 5.5 UserId Header Middleware (erzwingt X-User-Id pro Request, nach CORS und vor Endpoints)
+        app.UseMiddleware<UserIdHeaderMiddleware>();
+
         // 6. .NET Aspire endpoints
         app.MapDefaultEndpoints();
 
-        // 7. Health Checks for App Runner
-        app.MapHealthChecks("/health");
-
-        // 8. API Controllers
+        // 7. API Controllers
         app.MapControllers();
 
         return app;
