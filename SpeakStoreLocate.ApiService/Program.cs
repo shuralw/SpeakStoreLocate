@@ -1,4 +1,6 @@
+using System.Configuration;
 using SpeakStoreLocate.ApiService.Extensions;
+using SpeakStoreLocate.ApiService.Options;
 using SpeakStoreLocate.ServiceDefaults;
 
 namespace SpeakStoreLocate.ApiService;
@@ -8,13 +10,21 @@ public class Program
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+        string env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
 
         // 1. Logging Configuration
         builder.AddSerilogLogging();
 
+        builder.Configuration
+            .AddJsonFile("appsettings.json", false, true)
+            .AddJsonFile($"appsettings.{env}.json", true, true)
+            .AddUserSecrets<Program>()
+            .AddEnvironmentVariables();
+
+        builder.Services.Configure<OpenAIOptions>(builder.Configuration.GetSection(OpenAIOptions.SectionName));
         // 2. Service Configuration (Options Pattern with Environment Override)
         builder.Services.AddExternalServiceConfiguration(builder.Configuration);
-        builder.Services.AddAWSConfiguration(builder.Configuration);
+        builder.Services.AddAwsConfiguration(builder.Configuration);
 
         // 3. CORS Configuration
         builder.Services.AddCorsConfiguration(builder.Configuration, builder.Environment);
