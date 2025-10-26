@@ -46,6 +46,8 @@ public static class ApplicationServicesExtensions
         services.AddScoped<ITranscriptionService, DeepgramTranscriptionService>();
         services.AddScoped<IStorageRepository, AwsStorageRepository>();
         services.AddScoped<IChatCompletionService, OpenAiChatCompletionService>();
+        services.AddScoped<IInterpretationPromptParts, InterpretationPromptParts>();
+        services.AddScoped<IInterpretationPromptBuilder, InterpretationPromptBuilder>();
         services.AddScoped<IInterpretationService, InterpretationService>();
 
         return services;

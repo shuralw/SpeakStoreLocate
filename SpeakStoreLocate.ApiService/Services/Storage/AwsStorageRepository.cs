@@ -1,5 +1,6 @@
 using Amazon.DynamoDBv2.DataModel;
 using Amazon.DynamoDBv2.DocumentModel;
+using Microsoft.CodeAnalysis;
 using SpeakStoreLocate.ApiService.Models;
 using SpeakStoreLocate.ApiService.Utils;
 
@@ -113,6 +114,21 @@ public class AwsStorageRepository : IStorageRepository
 
         _logger.LogDebug("Anzahl an Ergebnissen: {performedActions}", performedActions.Count().ToString());
         return performedActions;
+    }
+
+    public async Task<IEnumerable<string>> GetStorageLocations()
+    {
+        var storageItems = await _dbContext
+            .ScanAsync<StorageItem>([])
+            .GetRemainingAsync();
+
+        var distinctLocations = storageItems
+            .Select(item => item.Location)
+            .Where(location => !string.IsNullOrEmpty(location))
+            .Distinct()
+            .ToList();
+        
+        return distinctLocations;
     }
 
     private async Task<StorageItem> FindStorageItemByName(StorageCommand cmd)

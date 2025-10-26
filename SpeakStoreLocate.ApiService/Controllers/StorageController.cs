@@ -44,12 +44,12 @@ public class StorageController : ControllerBase
         var origin = Request.Headers.Origin.FirstOrDefault();
         var userAgent = Request.Headers.UserAgent.FirstOrDefault();
         var referer = Request.Headers.Referer.FirstOrDefault();
-        
+
         _logger.LogInformation("GetItemsAsync called:");
         _logger.LogInformation("  Origin: {Origin}", origin ?? "(null)");
         _logger.LogInformation("  Referer: {Referer}", referer ?? "(null)");
         _logger.LogInformation("  User-Agent: {UserAgent}", userAgent ?? "(null)");
-        
+
         // Manually add CORS headers if needed
         if (!string.IsNullOrEmpty(origin))
         {
@@ -60,10 +60,10 @@ public class StorageController : ControllerBase
             // If no origin header, allow all for development
             Response.Headers.Add("Access-Control-Allow-Origin", "*");
         }
-        
+
         Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization");
-        
+
         return await this._storageRepository.GetStorageItems();
     }
 
@@ -73,13 +73,13 @@ public class StorageController : ControllerBase
     {
         var origin = Request.Headers.Origin.FirstOrDefault();
         _logger.LogInformation("OPTIONS (Preflight) request from origin: {Origin}", origin ?? "(null)");
-        
+
         // Manually set CORS headers for preflight
         Response.Headers.Add("Access-Control-Allow-Origin", origin ?? "*");
         Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
         Response.Headers.Add("Access-Control-Max-Age", "3600");
-        
+
         return Ok();
     }
 
@@ -89,12 +89,16 @@ public class StorageController : ControllerBase
     {
         var origin = Request.Headers.Origin.FirstOrDefault();
         _logger.LogInformation("UploadAudio called from origin: {Origin}", origin ?? "(null)");
-        
+
         var transcriptedText = await transcriptionService.TranscriptAudioAsync(request);
 
         _logger.LogInformation("Transkript generiert:{transcriptedText}", transcriptedText);
 
-        var commands = await this._interpretationService.InterpretGeschwafelToStructuredCommands(transcriptedText);
+        var existingLocations = (await this._storageRepository.GetStorageLocations());
+        var commands =
+            await this._interpretationService.InterpretGeschwafelToStructuredCommands(
+                transcriptedText,
+                existingLocations);
 
         var performedActions = await _storageRepository.PerformActions(commands);
 
