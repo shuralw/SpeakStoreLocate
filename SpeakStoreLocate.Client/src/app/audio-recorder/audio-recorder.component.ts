@@ -1,5 +1,5 @@
 import { Component, NgZone, OnInit } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { AudioCache } from './audio-cache';
@@ -231,25 +231,45 @@ export class AudioRecorderComponent implements OnInit {
 
       // Tabelle aktualisieren
       this.dataSource = await this.tryGetTableItems();
-    } catch {
+    } catch (err: any) {
       // Upload fehlgeschlagen
       this.zone.run(() => {
         upload.isUploading = false;
       });
 
-      if (!isRetry) {
-        console.log('[AudioRecorderComponent] Saving blob to AudioCache:', upload.blob);
+      const networkError = this.isNetworkError(err);
+
+      if (!isRetry && networkError) {
         try {
           await AudioCache.save(upload.blob);
-          console.info('[AudioRecorderComponent] Blob saved to AudioCache.');
-        } catch (err) {
-          console.error('[AudioRecorderComponent] Error saving blob to AudioCache:', err);
+        } catch (saveErr) {
+          console.error('[AudioRecorderComponent] Fehler beim lokalen Speichern:', saveErr);
         }
-        this.showResult(false, 'Offline: Audio wurde lokal gespeichert und wird später hochgeladen.');
+        const offline = typeof navigator !== 'undefined' ? !navigator.onLine : false;
+        this.showResult(false, offline ? 'Offline: Audio wurde lokal gespeichert und wird später hochgeladen.' : 'Netzwerkfehler: Audio lokal gespeichert, Upload folgt später.');
       } else {
-        this.showResult(false, 'Fehler beim Upload!');
+        // Kein Netzfehler: NICHT cachen
+        let msg = 'Upload fehlgeschlagen.';
+        if (err && err.status) {
+          msg = `Serverfehler (${err.status} ${err.statusText || ''}). Audio wurde nicht lokal gespeichert.`.trim();
+        }
+        this.showResult(false, msg);
       }
     }
+  }
+
+  private isNetworkError(err: any): boolean {
+    if (err instanceof HttpErrorResponse) {
+      return err.status === 0;
+    }
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      return true;
+    }
+    if (err && typeof err === 'object') {
+      if (typeof err.status === 'number' && err.status === 0) return true;
+      if (err.error && err.error instanceof ProgressEvent) return true;
+    }
+    return false;
   }
 
   // Baut ein PendingUpload-Objekt inklusive optionaler ID
