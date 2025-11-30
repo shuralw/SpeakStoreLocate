@@ -8,6 +8,15 @@ public class UserIdHeaderMiddleware
     private readonly ILogger<UserIdHeaderMiddleware> _logger;
     private static readonly Regex Allowed = new("^[A-Za-z0-9_-]{1,64}$", RegexOptions.Compiled);
 
+    // Pfade, die von der X-User-Id-Prüfung ausgenommen werden sollen
+    private static readonly PathString[] ExcludedPaths =
+    [
+        new("/health"),           // Health Checks
+        new("/ready"),            // evtl. weiterer Probe-Endpunkt
+        new("/liveness"),         // evtl. weiterer Probe-Endpunkt
+        new("/metrics")           // z.B. für Monitoring
+    ];
+
     public UserIdHeaderMiddleware(RequestDelegate next, ILogger<UserIdHeaderMiddleware> logger)
     {
         _next = next;
@@ -16,8 +25,15 @@ public class UserIdHeaderMiddleware
 
     public async Task InvokeAsync(HttpContext context, IUserContext userContext)
     {
-        // Preflight-Requests ohne Prüfung durchlassen
+        // Optionen/Preflight-Requests ohne Prüfung durchlassen
         if (HttpMethods.IsOptions(context.Request.Method))
+        {
+            await _next(context);
+            return;
+        }
+
+        // Bestimmte Pfade (Health Checks, Monitoring, Aspire-Infra) von der Prüfung ausnehmen
+        if (IsExcludedPath(context.Request.Path))
         {
             await _next(context);
             return;
@@ -44,5 +60,18 @@ public class UserIdHeaderMiddleware
         {
             await _next(context);
         }
+    }
+
+    private static bool IsExcludedPath(PathString requestPath)
+    {
+        foreach (var excluded in ExcludedPaths)
+        {
+            if (requestPath.StartsWithSegments(excluded, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
