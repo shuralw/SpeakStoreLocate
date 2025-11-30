@@ -3,6 +3,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { AudioCache } from './audio-cache';
+import { isUserIdHeaderError } from '../utils/http-error.utils';
 
 export interface PeriodicElement {
   location: string;
@@ -238,7 +239,7 @@ export class AudioRecorderComponent implements OnInit {
         upload.isUploading = false;
       });
 
-      if (httpError && this.isUserIdHeaderError(httpError)) {
+      if (httpError && isUserIdHeaderError(httpError)) {
         this.showResult(false, 'Upload fehlgeschlagen: Bitte User-ID setzen und erneut versuchen.');
         return;
       }
@@ -372,26 +373,5 @@ export class AudioRecorderComponent implements OnInit {
       this.showResult(false, 'Tabelle konnte nicht geladen werden.');
       return [];
     }
-  }
-
-  private isUserIdHeaderError(error: HttpErrorResponse): boolean {
-    if (error.status !== 400) {
-      return false;
-    }
-
-    const payload = this.extractErrorMessage(error).toLowerCase();
-    return payload.includes('missing x-user-id header') || payload.includes('invalid x-user-id header');
-  }
-
-  private extractErrorMessage(error: HttpErrorResponse): string {
-    if (typeof error.error === 'string') {
-      return error.error;
-    }
-
-    if (error.error && typeof (error.error as any).message === 'string') {
-      return (error.error as any).message;
-    }
-
-    return error.message ?? '';
   }
 }
