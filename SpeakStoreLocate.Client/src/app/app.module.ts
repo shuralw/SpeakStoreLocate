@@ -6,6 +6,7 @@ import { AppComponent } from './app.component';
 import { AudioRecorderComponent } from './audio-recorder/audio-recorder.component';
 import { HTTP_INTERCEPTORS, HttpClientModule } from '@angular/common/http';
 import { MatTableModule } from '@angular/material/table';
+import { MatSortModule } from '@angular/material/sort';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -34,6 +35,7 @@ import { HttpErrorInterceptor } from './interceptors/http-error.interceptor';
     AppRoutingModule,
     HttpClientModule,
     MatTableModule,
+    MatSortModule,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
@@ -44,8 +46,8 @@ import { HttpErrorInterceptor } from './interceptors/http-error.interceptor';
     MatFormFieldModule,
     MatInputModule,
     MatToolbarModule,
-  ReactiveFormsModule,
-  FormsModule,
+    ReactiveFormsModule,
+    FormsModule,
     MatSnackBarModule,
     MatChipsModule,
   ],
