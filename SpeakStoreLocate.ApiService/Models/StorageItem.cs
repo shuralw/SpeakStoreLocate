@@ -9,5 +9,6 @@ public class StorageItem
     [DynamoDBProperty] public string Name { get; set; }
     [DynamoDBProperty] public string NormalizedName { get; set; }
     [DynamoDBProperty] public string Location { get; set; }
+    [DynamoDBProperty] public string NormalizedLocation { get; set; }
     [DynamoDBProperty] public string UserId { get; set; }
 }
