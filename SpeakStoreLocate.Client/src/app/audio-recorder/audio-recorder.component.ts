@@ -6,6 +6,7 @@ import { AudioCache } from './audio-cache';
 import { isUserIdHeaderError } from '../utils/http-error.utils';
 
 export interface PeriodicElement {
+  id: string;
   location: string;
   name: string;
 }
@@ -28,7 +29,7 @@ export class AudioRecorderComponent implements OnInit {
   // Base URL is provided via Angular environments for dev/prod
   private readonly API_BASE = environment.apiBase;
   dataSource: PeriodicElement[] = [];
-  displayedColumns = ['location', 'name'];
+  displayedColumns = ['location', 'name', 'actions'];
 
   isRecording = false;
   showPopup = false;
@@ -42,6 +43,11 @@ export class AudioRecorderComponent implements OnInit {
 
   pendingUploads: PendingUpload[] = [];
   currentlyPlaying?: string;
+
+  // Editing state
+  editingId?: string;
+  editName: string = '';
+  editLocation: string = '';
 
   constructor(private http: HttpClient, private zone: NgZone) { }
 
@@ -366,12 +372,54 @@ export class AudioRecorderComponent implements OnInit {
 
   private async tryGetTableItems(): Promise<PeriodicElement[]> {
     try {
-      return firstValueFrom(
-        this.http.get<PeriodicElement[]>(`${this.API_BASE}`)
+      const raw = await firstValueFrom(
+        this.http.get<any[]>(`${this.API_BASE}`)
       );
+      // Map API (Id/Name/Location) to client model (id/name/location)
+      return (raw ?? []).map(x => ({
+        id: x.id ?? x.Id,
+        name: x.name ?? x.Name,
+        location: x.location ?? x.Location,
+      } as PeriodicElement));
     } catch {
       this.showResult(false, 'Tabelle konnte nicht geladen werden.');
       return [];
+    }
+  }
+
+  startEdit(row: PeriodicElement) {
+    this.editingId = row.id;
+    this.editName = row.name;
+    this.editLocation = row.location;
+  }
+
+  cancelEdit() {
+    this.editingId = undefined;
+    this.editName = '';
+    this.editLocation = '';
+  }
+
+  async saveEdit(row: PeriodicElement) {
+    const trimmedName = (this.editName ?? '').trim();
+    const trimmedLocation = (this.editLocation ?? '').trim();
+    if (!trimmedName || !trimmedLocation) {
+      this.showResult(false, 'Name und Ort dürfen nicht leer sein.');
+      return;
+    }
+
+    try {
+      const body = { name: trimmedName, location: trimmedLocation };
+      await firstValueFrom(this.http.put(`${this.API_BASE}/${row.id}`, body));
+      this.showResult(true, 'Eintrag aktualisiert.');
+      this.cancelEdit();
+      await this.loadTableAsync();
+    } catch (err) {
+      const httpError = err as HttpErrorResponse | undefined;
+      if (httpError && isUserIdHeaderError(httpError)) {
+        this.showResult(false, 'Aktualisierung fehlgeschlagen: Bitte User-ID setzen.');
+        return;
+      }
+      this.showResult(false, 'Fehler beim Aktualisieren.');
     }
   }
 }

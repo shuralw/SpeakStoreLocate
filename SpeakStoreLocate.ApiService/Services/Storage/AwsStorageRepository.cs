@@ -142,6 +142,42 @@ public class AwsStorageRepository : IStorageRepository
         return distinctLocations;
     }
 
+    public async Task<StorageItem?> UpdateStorageItemAsync(string id, string? name, string? location)
+    {
+        // Load item by hash key (Id)
+        var item = await _dbContext.LoadAsync<StorageItem>(id);
+        if (item == null)
+        {
+            return null;
+        }
+
+        // Ensure user owns the item
+        if (!string.Equals(item.UserId, _userContext.UserId, StringComparison.Ordinal))
+        {
+            // Not authorized to modify
+            return null;
+        }
+
+        var originalLocation = item.Location;
+
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            item.Name = name;
+            item.NormalizedName = name.NormalizeForSearch();
+        }
+        if (!string.IsNullOrWhiteSpace(location))
+        {
+            item.Location = location!;
+        }
+
+        await _dbContext.SaveAsync(item);
+
+        _logger.LogInformation("Item {ItemId} updated. Name={Name}, Location: {OldLoc} -> {NewLoc}",
+            item.Id, item.Name, originalLocation, item.Location);
+
+        return item;
+    }
+
     private async Task<StorageItem> FindStorageItemByName(StorageCommand cmd)
     {
         var normalizedQuery = cmd.ItemName.NormalizeForSearch();
