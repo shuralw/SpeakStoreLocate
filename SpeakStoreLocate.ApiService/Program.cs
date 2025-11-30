@@ -46,9 +46,6 @@ public class Program
         builder.Services.AddControllers();
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();
-        
-        // 8. Health Checks for App Runner
-        builder.Services.AddHealthChecks();
 
         var app = builder.Build();
 
@@ -84,10 +81,11 @@ public static class PipelineExtensions
         // 5.5 UserId Header Middleware (erzwingt X-User-Id pro Request, nach CORS und vor Endpoints)
         app.UseMiddleware<UserIdHeaderMiddleware>();
 
-        // 6. .NET Aspire endpoints
+        // 6. .NET Aspire endpoints (maps health checks only in Development)
         app.MapDefaultEndpoints();
 
-        // 7. Health Checks for App Runner
+        // 7. Health Checks for App Runner (needed in all environments for production monitoring)
+        // Note: MapDefaultEndpoints() only maps /health in Development, so we explicitly map it here
         app.MapHealthChecks("/health");
 
         // 8. API Controllers
