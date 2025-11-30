@@ -77,7 +77,7 @@ export class UserIdBarComponent implements OnInit, OnDestroy {
     }
 
     saveUserId(): void {
-        console.log('saving user id');
+        
         this.userIdControl.markAsTouched();
         const rawValue = this.userIdControl.value ?? '';
         const trimmed = rawValue.trim();
