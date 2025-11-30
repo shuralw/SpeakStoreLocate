@@ -1,9 +1,12 @@
-import { Component, NgZone, OnInit } from '@angular/core';
+import { Component, NgZone, OnInit, ViewChild } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { AudioCache } from './audio-cache';
 import { isUserIdHeaderError } from '../utils/http-error.utils';
+import { MatTableDataSource } from '@angular/material/table';
+import { MatSort } from '@angular/material/sort';
+import { FormControl } from '@angular/forms';
 
 export interface PeriodicElement {
   id: string;
@@ -28,8 +31,11 @@ export class AudioRecorderComponent implements OnInit {
 
   // Base URL is provided via Angular environments for dev/prod
   private readonly API_BASE = environment.apiBase;
-  dataSource: PeriodicElement[] = [];
+  dataSource = new MatTableDataSource<PeriodicElement>([]);
   displayedColumns = ['location', 'name', 'actions'];
+  filterNameControl = new FormControl('');
+  filterLocationControl = new FormControl('');
+  @ViewChild(MatSort) sort?: MatSort;
 
   isRecording = false;
   showPopup = false;
@@ -60,11 +66,18 @@ export class AudioRecorderComponent implements OnInit {
     try {
       const items = await this.tryGetTableItems();
       this.zone.run(() => {
-        this.dataSource = items.sort((a, b) => a.name.localeCompare(b.name));
+        this.dataSource.data = items;
+        if (this.sort) {
+          this.dataSource.sort = this.sort;
+          // Default sort by name ascending
+          (this.sort as MatSort).active = 'name';
+          (this.sort as MatSort).direction = 'asc';
+        }
+  this.setupFilters();
       });
     } catch {
       this.zone.run(() => {
-        this.dataSource = [];
+        this.dataSource.data = [];
       });
     }
   }
@@ -237,7 +250,10 @@ export class AudioRecorderComponent implements OnInit {
       }
 
       // Tabelle aktualisieren
-      this.dataSource = await this.tryGetTableItems();
+      const items = await this.tryGetTableItems();
+      this.zone.run(() => {
+        this.dataSource.data = items;
+      });
       } catch (err: any) {
       const httpError = err as HttpErrorResponse | undefined;
       // Upload fehlgeschlagen
@@ -385,6 +401,28 @@ export class AudioRecorderComponent implements OnInit {
       this.showResult(false, 'Tabelle konnte nicht geladen werden.');
       return [];
     }
+  }
+
+  private setupFilters() {
+    // Column-specific filtering using two controls. We encode both values into one trigger string,
+    // but actually read the controls inside the predicate.
+    this.dataSource.filterPredicate = (data: PeriodicElement, _filter: string) => {
+      const nameTerm = (this.filterNameControl.value ?? '').toString().trim().toLowerCase();
+      const locTerm = (this.filterLocationControl.value ?? '').toString().trim().toLowerCase();
+
+      const nameMatch = !nameTerm || (data.name ?? '').toLowerCase().includes(nameTerm);
+      const locMatch = !locTerm || (data.location ?? '').toLowerCase().includes(locTerm);
+      return nameMatch && locMatch;
+    };
+
+    const apply = () => {
+      // Any change triggers filtering; value content is irrelevant due to predicate reading controls.
+      this.dataSource.filter = `${Date.now()}`;
+    };
+
+    apply();
+    this.filterNameControl.valueChanges.subscribe(() => apply());
+    this.filterLocationControl.valueChanges.subscribe(() => apply());
   }
 
   startEdit(row: PeriodicElement) {

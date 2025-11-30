@@ -93,20 +93,26 @@
         </mat-card-title>
       </mat-card-header>
       <mat-card-content>
-        <table mat-table [dataSource]="dataSource" class="results-table">
-          <ng-container matColumnDef="location">
-            <th mat-header-cell *matHeaderCellDef>Ort</th>
-            <td mat-cell *matCellDef="let element">
-              <ng-container *ngIf="editingId === element.id; else viewLocation">
-                <mat-form-field appearance="outline" style="width: 100%;">
-                  <input matInput placeholder="Ort" [(ngModel)]="editLocation">
-                </mat-form-field>
-              </ng-container>
-              <ng-template #viewLocation>{{element.location}}</ng-template>
-            </td>
-          </ng-container>
+        <div class="table-toolbar" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; align-items:center; margin-bottom:12px;">
+          <mat-form-field appearance="outline">
+            <mat-label>Filter Ort</mat-label>
+            <input matInput [formControl]="filterLocationControl" placeholder="z.B. Küche">
+            <button *ngIf="filterLocationControl.value" matSuffix mat-icon-button aria-label="Clear" (click)="filterLocationControl.setValue('')">
+              <mat-icon>close</mat-icon>
+            </button>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Filter Name</mat-label>
+            <input matInput [formControl]="filterNameControl" placeholder="z.B. Schrauben">
+            <button *ngIf="filterNameControl.value" matSuffix mat-icon-button aria-label="Clear" (click)="filterNameControl.setValue('')">
+              <mat-icon>close</mat-icon>
+            </button>
+          </mat-form-field>
+        </div>
+
+        <table mat-table [dataSource]="dataSource" class="results-table" matSort>
           <ng-container matColumnDef="name">
-            <th mat-header-cell *matHeaderCellDef>Name</th>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
             <td mat-cell *matCellDef="let element">
               <ng-container *ngIf="editingId === element.id; else viewName">
                 <mat-form-field appearance="outline" style="width: 100%;">
@@ -114,6 +120,17 @@
                 </mat-form-field>
               </ng-container>
               <ng-template #viewName>{{element.name}}</ng-template>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="location">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Ort</th>
+            <td mat-cell *matCellDef="let element">
+              <ng-container *ngIf="editingId === element.id; else viewLocation">
+                <mat-form-field appearance="outline" style="width: 100%;">
+                  <input matInput placeholder="Ort" [(ngModel)]="editLocation">
+                </mat-form-field>
+              </ng-container>
+              <ng-template #viewLocation>{{element.location}}</ng-template>
             </td>
           </ng-container>
           <ng-container matColumnDef="actions">
