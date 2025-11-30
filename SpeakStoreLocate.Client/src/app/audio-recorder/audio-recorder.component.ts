@@ -69,6 +69,9 @@ export class AudioRecorderComponent implements OnInit, OnDestroy {
   private audioContext?: AudioContext;
   private analyserNode?: AnalyserNode;
   private audioLevelAnimationFrame?: number;
+  private mediaStreamSource?: MediaStreamAudioSourceNode;
+  // Amplification factor to make audio level more visible (raw values are often low)
+  private static readonly AUDIO_AMPLIFICATION_FACTOR = 2;
 
   // Editing state
   editingId?: string;
@@ -537,9 +540,9 @@ export class AudioRecorderComponent implements OnInit, OnDestroy {
     this.analyserNode.fftSize = 256;
     this.analyserNode.smoothingTimeConstant = 0.3;
 
-    // Connect microphone stream to analyser
-    const source = this.audioContext.createMediaStreamSource(stream);
-    source.connect(this.analyserNode);
+    // Connect microphone stream to analyser and store reference for cleanup
+    this.mediaStreamSource = this.audioContext.createMediaStreamSource(stream);
+    this.mediaStreamSource.connect(this.analyserNode);
 
     // Start monitoring audio levels
     this.monitorAudioLevel();
@@ -550,6 +553,12 @@ export class AudioRecorderComponent implements OnInit, OnDestroy {
     if (this.audioLevelAnimationFrame) {
       cancelAnimationFrame(this.audioLevelAnimationFrame);
       this.audioLevelAnimationFrame = undefined;
+    }
+
+    // Disconnect and clear media stream source
+    if (this.mediaStreamSource) {
+      this.mediaStreamSource.disconnect();
+      this.mediaStreamSource = undefined;
     }
 
     // Disconnect and clear analyser
@@ -576,8 +585,8 @@ export class AudioRecorderComponent implements OnInit, OnDestroy {
     const sum = dataArray.reduce((acc, val) => acc + val, 0);
     const average = sum / dataArray.length;
 
-    // Normalize to 0-100 percentage
-    const normalizedLevel = Math.min(100, (average / 255) * 100 * 2);
+    // Normalize to 0-100 percentage with amplification
+    const normalizedLevel = Math.min(100, (average / 255) * 100 * AudioRecorderComponent.AUDIO_AMPLIFICATION_FACTOR);
 
     this.zone.run(() => {
       this.audioLevel = normalizedLevel;
