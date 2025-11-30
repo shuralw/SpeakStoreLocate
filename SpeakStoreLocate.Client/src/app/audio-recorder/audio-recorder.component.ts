@@ -54,7 +54,7 @@ export class AudioRecorderComponent implements OnInit {
     try {
       const items = await this.tryGetTableItems();
       this.zone.run(() => {
-        this.dataSource = items;
+        this.dataSource = items.sort((a, b) => (a > b ? 1 : -1));
       });
     } catch {
       this.zone.run(() => {
@@ -232,7 +232,7 @@ export class AudioRecorderComponent implements OnInit {
 
       // Tabelle aktualisieren
       this.dataSource = await this.tryGetTableItems();
-      } catch (err: any) {
+    } catch (err: any) {
       const httpError = err as HttpErrorResponse | undefined;
       // Upload fehlgeschlagen
       this.zone.run(() => {
@@ -259,7 +259,7 @@ export class AudioRecorderComponent implements OnInit {
       }
     }
   }
-  
+
 
   private isNetworkError(err: any): boolean {
     if (err instanceof HttpErrorResponse) {
