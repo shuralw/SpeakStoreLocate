@@ -1,6 +1,13 @@
 import { HttpErrorResponse } from '@angular/common/http';
 
 /**
+ * Type guard to check if an object has a string message property.
+ */
+function hasStringMessage(obj: unknown): obj is { message: string } {
+  return typeof obj === 'object' && obj !== null && 'message' in obj && typeof (obj as Record<string, unknown>)['message'] === 'string';
+}
+
+/**
  * Extracts the error message from an HttpErrorResponse.
  * Handles different response formats including string errors,
  * objects with a message property, or falls back to the response message.
@@ -10,8 +17,8 @@ export function extractErrorMessage(error: HttpErrorResponse): string {
     return error.error;
   }
 
-  if (error.error && typeof (error.error as { message?: unknown }).message === 'string') {
-    return (error.error as { message: string }).message;
+  if (hasStringMessage(error.error)) {
+    return error.error.message;
   }
 
   return error.message ?? '';
