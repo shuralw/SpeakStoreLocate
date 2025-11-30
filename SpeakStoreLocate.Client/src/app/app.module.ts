@@ -16,7 +16,7 @@ import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatToolbarModule } from '@angular/material/toolbar';
-import { ReactiveFormsModule } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatChipsModule } from '@angular/material/chips';
 import { UserIdBarComponent } from './components/user-id-bar/user-id-bar.component';
@@ -44,7 +44,8 @@ import { HttpErrorInterceptor } from './interceptors/http-error.interceptor';
     MatFormFieldModule,
     MatInputModule,
     MatToolbarModule,
-    ReactiveFormsModule,
+  ReactiveFormsModule,
+  FormsModule,
     MatSnackBarModule,
     MatChipsModule,
   ],

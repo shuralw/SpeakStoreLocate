@@ -14,6 +14,15 @@ Run `ng generate component component-name` to generate a new component. You can 
 
 Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
 
+## Items bearbeiten (Name und Ort)
+
+- Öffne die Seite mit der Tabelle "Gespeicherte Aufnahmen".
+- Klicke auf das Stift-Symbol in der entsprechenden Zeile.
+- Ändere "Ort" und/oder "Name" im Inline-Formular.
+- Klicke auf den Haken zum Speichern oder auf das X zum Abbrechen.
+
+Voraussetzung: Der API-Dienst läuft lokal (Standard: `http://localhost:5471/api/storage`) und akzeptiert die `X-User-Id`-Header, die der Client automatisch mitschickt.
+
 ## Running unit tests
 
 Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).

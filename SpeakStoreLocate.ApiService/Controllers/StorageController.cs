@@ -7,6 +7,7 @@ using SpeakStoreLocate.ApiService.Models;
 using SpeakStoreLocate.ApiService.Services.Interpretation;
 using SpeakStoreLocate.ApiService.Services.Storage;
 using SpeakStoreLocate.ApiService.Services.Transcription;
+using System.ComponentModel.DataAnnotations;
 
 namespace SpeakStoreLocate.ApiService.Controllers;
 
@@ -15,10 +16,7 @@ namespace SpeakStoreLocate.ApiService.Controllers;
 [EnableCors("DefaultCorsPolicy")]
 public class StorageController : ControllerBase
 {
-    private readonly AmazonTranscribeServiceClient _transcribeClient;
-    private readonly AmazonS3Client _s3Client;
     private readonly ILogger<StorageController> _logger;
-    private readonly IListenRESTClient deepgramClient;
     private readonly ITranscriptionService transcriptionService;
     private readonly IStorageRepository _storageRepository;
     private readonly IInterpretationService _interpretationService;
@@ -53,16 +51,16 @@ public class StorageController : ControllerBase
         // Manually add CORS headers if needed
         if (!string.IsNullOrEmpty(origin))
         {
-            Response.Headers.Add("Access-Control-Allow-Origin", origin);
+            Response.Headers["Access-Control-Allow-Origin"] = origin;
         }
         else
         {
             // If no origin header, allow all for development
-            Response.Headers.Add("Access-Control-Allow-Origin", "*");
+            Response.Headers["Access-Control-Allow-Origin"] = "*";
         }
 
-        Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-Id");
+        Response.Headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS";
+        Response.Headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-User-Id";
 
         return await this._storageRepository.GetStorageItems();
     }
@@ -75,10 +73,10 @@ public class StorageController : ControllerBase
         _logger.LogInformation("OPTIONS (Preflight) request from origin: {Origin}", origin ?? "(null)");
 
         // Manually set CORS headers for preflight
-        Response.Headers.Add("Access-Control-Allow-Origin", origin ?? "*");
-        Response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-User-Id");
-        Response.Headers.Add("Access-Control-Max-Age", "3600");
+    Response.Headers["Access-Control-Allow-Origin"] = origin ?? "*";
+    Response.Headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS";
+    Response.Headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, X-User-Id";
+    Response.Headers["Access-Control-Max-Age"] = "3600";
 
         return Ok();
     }
@@ -103,5 +101,40 @@ public class StorageController : ControllerBase
         var performedActions = await _storageRepository.PerformActions(commands);
 
         return Ok(performedActions);
+    }
+
+    public class UpdateStorageItemRequest
+    {
+        public string? Name { get; set; }
+        public string? Location { get; set; }
+    }
+
+    [HttpPut("{id}")]
+    [EnableCors("DefaultCorsPolicy")]
+    public async Task<IActionResult> UpdateItem([FromRoute][Required] string id, [FromBody] UpdateStorageItemRequest request)
+    {
+        if (request == null)
+        {
+            return BadRequest("Invalid request body");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Name) && string.IsNullOrWhiteSpace(request.Location))
+        {
+            return BadRequest("No fields to update");
+        }
+
+        var updated = await _storageRepository.UpdateStorageItemAsync(id, request.Name, request.Location);
+        if (updated == null)
+        {
+            return NotFound();
+        }
+
+        // CORS headers similar to GET
+        var origin = Request.Headers.Origin.FirstOrDefault();
+    Response.Headers["Access-Control-Allow-Origin"] = origin ?? "*";
+    Response.Headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS";
+    Response.Headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-User-Id";
+
+        return Ok(updated);
     }
 }
