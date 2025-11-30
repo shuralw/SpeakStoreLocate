@@ -231,32 +231,34 @@ export class AudioRecorderComponent implements OnInit {
 
       // Tabelle aktualisieren
       this.dataSource = await this.tryGetTableItems();
-    } catch (err: any) {
+      } catch (err: any) {
+      const httpError = err as HttpErrorResponse | undefined;
       // Upload fehlgeschlagen
       this.zone.run(() => {
         upload.isUploading = false;
       });
+
+      if (httpError && this.isUserIdHeaderError(httpError)) {
+        this.showResult(false, 'Upload fehlgeschlagen: Bitte User-ID setzen und erneut versuchen.');
+        return;
+      }
 
       const networkError = this.isNetworkError(err);
 
       if (!isRetry && networkError) {
         try {
           await AudioCache.save(upload.blob);
-        } catch (saveErr) {
-          console.error('[AudioRecorderComponent] Fehler beim lokalen Speichern:', saveErr);
+          console.info('[AudioRecorderComponent] Blob saved to AudioCache.');
+        } catch (err) {
+          console.error('[AudioRecorderComponent] Error saving blob to AudioCache:', err);
         }
-        const offline = typeof navigator !== 'undefined' ? !navigator.onLine : false;
-        this.showResult(false, offline ? 'Offline: Audio wurde lokal gespeichert und wird später hochgeladen.' : 'Netzwerkfehler: Audio lokal gespeichert, Upload folgt später.');
+        this.showResult(false, 'Offline: Audio wurde lokal gespeichert und wird später hochgeladen.');
       } else {
-        // Kein Netzfehler: NICHT cachen
-        let msg = 'Upload fehlgeschlagen.';
-        if (err && err.status) {
-          msg = `Serverfehler (${err.status} ${err.statusText || ''}). Audio wurde nicht lokal gespeichert.`.trim();
-        }
-        this.showResult(false, msg);
+        this.showResult(false, 'Fehler beim Upload!');
       }
     }
   }
+  
 
   private isNetworkError(err: any): boolean {
     if (err instanceof HttpErrorResponse) {
@@ -370,5 +372,26 @@ export class AudioRecorderComponent implements OnInit {
       this.showResult(false, 'Tabelle konnte nicht geladen werden.');
       return [];
     }
+  }
+
+  private isUserIdHeaderError(error: HttpErrorResponse): boolean {
+    if (error.status !== 400) {
+      return false;
+    }
+
+    const payload = this.extractErrorMessage(error).toLowerCase();
+    return payload.includes('missing x-user-id header') || payload.includes('invalid x-user-id header');
+  }
+
+  private extractErrorMessage(error: HttpErrorResponse): string {
+    if (typeof error.error === 'string') {
+      return error.error;
+    }
+
+    if (error.error && typeof (error.error as any).message === 'string') {
+      return (error.error as any).message;
+    }
+
+    return error.message ?? '';
   }
 }
