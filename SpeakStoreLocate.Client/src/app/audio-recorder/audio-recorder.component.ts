@@ -36,6 +36,8 @@ export class AudioRecorderComponent implements OnInit {
   filterNameControl = new FormControl('');
   filterLocationControl = new FormControl('');
   @ViewChild(MatSort) sort?: MatSort;
+  // Filters visibility toggle (default hidden)
+  showFilters = false;
 
   isRecording = false;
   showPopup = false;
@@ -60,6 +62,11 @@ export class AudioRecorderComponent implements OnInit {
   constructor(private http: HttpClient, private zone: NgZone) { }
 
   async ngOnInit() {
+    // Restore filter visibility preference
+    try {
+      const persisted = localStorage.getItem('audioRecorder.showFilters');
+      this.showFilters = persisted === 'true';
+    } catch {}
     void this.loadCachedUploadsAsync();
     void this.loadTableAsync();
   }
@@ -424,6 +431,11 @@ export class AudioRecorderComponent implements OnInit {
     apply();
     this.filterNameControl.valueChanges.subscribe(() => apply());
     this.filterLocationControl.valueChanges.subscribe(() => apply());
+  }
+
+  toggleFilters() {
+    this.showFilters = !this.showFilters;
+    try { localStorage.setItem('audioRecorder.showFilters', this.showFilters ? 'true' : 'false'); } catch {}
   }
 
   startEdit(row: PeriodicElement) {

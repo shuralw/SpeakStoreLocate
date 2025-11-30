@@ -87,13 +87,22 @@
   <div class="table-section">
     <mat-card>
       <mat-card-header>
-        <mat-card-title>
-          <mat-icon>list</mat-icon>
-          Gespeicherte Aufnahmen
-        </mat-card-title>
+        <div class="table-header-grid">
+          <div class="cell icon" aria-hidden="true">
+            <mat-icon>list</mat-icon>
+          </div>
+          <div class="cell title">
+            Gespeicherte Aufnahmen
+          </div>
+          <div class="cell actions">
+            <button mat-icon-button (click)="toggleFilters()" [color]="showFilters ? 'accent' : undefined" matTooltip="Filter anzeigen/ausblenden">
+              <mat-icon>{{ showFilters ? 'filter_alt' : 'filter_alt_off' }}</mat-icon>
+            </button>
+          </div>
+        </div>
       </mat-card-header>
       <mat-card-content>
-        <div class="table-toolbar" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; align-items:center; margin-bottom:12px;">
+        <div *ngIf="showFilters" class="table-toolbar" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; align-items:center; margin-bottom:12px;">
           <mat-form-field appearance="outline">
             <mat-label>Filter Ort</mat-label>
             <input matInput [formControl]="filterLocationControl" placeholder="z.B. Küche">
