@@ -364,3 +364,5 @@ FodyWeavers.xsd
 .idea/.idea.SpeakStoreLocate/.idea/copilotDiffState.xml
 .idea/.idea.SpeakStoreLocate/.idea/jsLibraryMappings.xml
 SpeakStoreLocate.ApiService/log.txt
+
+.vscode/settings.json
