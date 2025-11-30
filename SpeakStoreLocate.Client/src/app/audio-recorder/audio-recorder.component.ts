@@ -1,4 +1,4 @@
-import { Component, NgZone, OnInit, ViewChild } from '@angular/core';
+import { Component, NgZone, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environments/environment';
@@ -30,7 +30,7 @@ export interface PendingUpload {
   templateUrl: './audio-recorder.component.html',
   styleUrls: ['./audio-recorder.component.scss'],
 })
-export class AudioRecorderComponent implements OnInit {
+export class AudioRecorderComponent implements OnInit, OnDestroy {
 
   // Base URL is provided via Angular environments for dev/prod
   private readonly API_BASE = environment.apiBase;
@@ -64,6 +64,11 @@ export class AudioRecorderComponent implements OnInit {
   get archivedUploadsCount(): number {
     return this.pendingUploads.filter(u => !!u.archived).length;
   }
+  // Audio level indicator properties
+  audioLevel: number = 0;
+  private audioContext?: AudioContext;
+  private analyserNode?: AnalyserNode;
+  private audioLevelAnimationFrame?: number;
 
   // Editing state
   editingId?: string;
@@ -82,6 +87,14 @@ export class AudioRecorderComponent implements OnInit {
     } catch {}
     void this.loadCachedUploadsAsync();
     void this.loadTableAsync();
+  }
+
+  ngOnDestroy() {
+    this.stopAudioLevelMonitoring();
+    if (this.audioContext) {
+      this.audioContext.close();
+      this.audioContext = undefined;
+    }
   }
 
   private async loadTableAsync(): Promise<void> {
@@ -141,6 +154,9 @@ export class AudioRecorderComponent implements OnInit {
     // immer frisch holen, um leere Blobs zu vermeiden
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
+    // Start audio level monitoring
+    this.startAudioLevelMonitoring(this.stream);
+
     // Pointer Capture auf den Button
     const btn = evt.target as HTMLElement;
     if (btn && typeof (btn as any).setPointerCapture === 'function') {
@@ -173,6 +189,9 @@ export class AudioRecorderComponent implements OnInit {
       return;
     }
 
+    // Stop audio level monitoring
+    this.stopAudioLevelMonitoring();
+
     // Pointer Capture lösen
     const btn = evt.target as HTMLElement;
     if (btn && typeof (btn as any).releasePointerCapture === 'function') {
@@ -190,6 +209,9 @@ export class AudioRecorderComponent implements OnInit {
   onPointerCancel(evt: PointerEvent) {
     console.log('[AudioRecorderComponent] onPointerCancel', evt);
     if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+      // Stop audio level monitoring
+      this.stopAudioLevelMonitoring();
+
       // Pointer Capture lösen und Aufnahme sauber beenden,
       // damit onRecordingStop() den Blob bauen und den Upload anstoßen kann
       const btn = evt.target as HTMLElement;
@@ -502,5 +524,66 @@ export class AudioRecorderComponent implements OnInit {
       }
       this.showResult(false, 'Fehler beim Aktualisieren.');
     }
+  }
+
+  private startAudioLevelMonitoring(stream: MediaStream): void {
+    // Create AudioContext if not exists
+    if (!this.audioContext) {
+      this.audioContext = new AudioContext();
+    }
+
+    // Create analyser node
+    this.analyserNode = this.audioContext.createAnalyser();
+    this.analyserNode.fftSize = 256;
+    this.analyserNode.smoothingTimeConstant = 0.3;
+
+    // Connect microphone stream to analyser
+    const source = this.audioContext.createMediaStreamSource(stream);
+    source.connect(this.analyserNode);
+
+    // Start monitoring audio levels
+    this.monitorAudioLevel();
+  }
+
+  private stopAudioLevelMonitoring(): void {
+    // Cancel animation frame
+    if (this.audioLevelAnimationFrame) {
+      cancelAnimationFrame(this.audioLevelAnimationFrame);
+      this.audioLevelAnimationFrame = undefined;
+    }
+
+    // Disconnect and clear analyser
+    if (this.analyserNode) {
+      this.analyserNode.disconnect();
+      this.analyserNode = undefined;
+    }
+
+    // Reset audio level to 0
+    this.zone.run(() => {
+      this.audioLevel = 0;
+    });
+  }
+
+  private monitorAudioLevel(): void {
+    if (!this.analyserNode || !this.isRecording) {
+      return;
+    }
+
+    const dataArray = new Uint8Array(this.analyserNode.frequencyBinCount);
+    this.analyserNode.getByteFrequencyData(dataArray);
+
+    // Calculate average level (0-255 range)
+    const sum = dataArray.reduce((acc, val) => acc + val, 0);
+    const average = sum / dataArray.length;
+
+    // Normalize to 0-100 percentage
+    const normalizedLevel = Math.min(100, (average / 255) * 100 * 2);
+
+    this.zone.run(() => {
+      this.audioLevel = normalizedLevel;
+    });
+
+    // Continue monitoring
+    this.audioLevelAnimationFrame = requestAnimationFrame(() => this.monitorAudioLevel());
   }
 }
