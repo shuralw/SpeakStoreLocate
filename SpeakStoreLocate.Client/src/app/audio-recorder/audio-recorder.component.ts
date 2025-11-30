@@ -54,6 +54,8 @@ export class AudioRecorderComponent implements OnInit {
   editingId?: string;
   editName: string = '';
   editLocation: string = '';
+  private editingOriginalName: string = '';
+  private editingOriginalLocation: string = '';
 
   constructor(private http: HttpClient, private zone: NgZone) { }
 
@@ -426,15 +428,30 @@ export class AudioRecorderComponent implements OnInit {
   }
 
   startEdit(row: PeriodicElement) {
+    // If already editing another row and unsaved changes exist -> confirm
+    if (this.editingId && this.editingId !== row.id) {
+      const hasUnsaved = (this.editName !== this.editingOriginalName) || (this.editLocation !== this.editingOriginalLocation);
+      if (hasUnsaved) {
+        const proceed = window.confirm('Es gibt ungespeicherte Änderungen. Wirklich wechseln und Änderungen verwerfen?');
+        if (!proceed) {
+          return; // abort switching
+        }
+      }
+    }
+
     this.editingId = row.id;
     this.editName = row.name;
     this.editLocation = row.location;
+    this.editingOriginalName = row.name;
+    this.editingOriginalLocation = row.location;
   }
 
   cancelEdit() {
     this.editingId = undefined;
     this.editName = '';
     this.editLocation = '';
+    this.editingOriginalName = '';
+    this.editingOriginalLocation = '';
   }
 
   async saveEdit(row: PeriodicElement) {
@@ -450,6 +467,9 @@ export class AudioRecorderComponent implements OnInit {
       await firstValueFrom(this.http.put(`${this.API_BASE}/${row.id}`, body));
       this.showResult(true, 'Eintrag aktualisiert.');
       this.cancelEdit();
+  // After successful save, originals reset
+  this.editingOriginalName = '';
+  this.editingOriginalLocation = '';
       await this.loadTableAsync();
     } catch (err) {
       const httpError = err as HttpErrorResponse | undefined;
