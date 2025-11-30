@@ -54,7 +54,7 @@ export class AudioRecorderComponent implements OnInit {
     try {
       const items = await this.tryGetTableItems();
       this.zone.run(() => {
-        this.dataSource = items;
+        this.dataSource = items.sort((a, b) => a.name.localeCompare(b.name));
       });
     } catch {
       this.zone.run(() => {
