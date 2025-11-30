@@ -75,7 +75,7 @@ export class AudioRecorderComponent implements OnInit {
           (this.sort as MatSort).active = 'name';
           (this.sort as MatSort).direction = 'asc';
         }
-  this.setupFilters();
+        this.setupFilters();
       });
     } catch {
       this.zone.run(() => {
@@ -256,7 +256,7 @@ export class AudioRecorderComponent implements OnInit {
       this.zone.run(() => {
         this.dataSource.data = items;
       });
-      } catch (err: any) {
+    } catch (err: any) {
       const httpError = err as HttpErrorResponse | undefined;
       // Upload fehlgeschlagen
       this.zone.run(() => {
@@ -283,7 +283,6 @@ export class AudioRecorderComponent implements OnInit {
       }
     }
   }
-  
 
   private isNetworkError(err: any): boolean {
     if (err instanceof HttpErrorResponse) {
@@ -467,9 +466,9 @@ export class AudioRecorderComponent implements OnInit {
       await firstValueFrom(this.http.put(`${this.API_BASE}/${row.id}`, body));
       this.showResult(true, 'Eintrag aktualisiert.');
       this.cancelEdit();
-  // After successful save, originals reset
-  this.editingOriginalName = '';
-  this.editingOriginalLocation = '';
+      // After successful save, originals reset
+      this.editingOriginalName = '';
+      this.editingOriginalLocation = '';
       await this.loadTableAsync();
     } catch (err) {
       const httpError = err as HttpErrorResponse | undefined;
