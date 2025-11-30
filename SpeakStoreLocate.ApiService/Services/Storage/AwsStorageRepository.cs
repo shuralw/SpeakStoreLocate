@@ -107,6 +107,7 @@ public class AwsStorageRepository : IStorageRepository
                     Name = cmd.ItemName,
                     Location = cmd.Destination,
                     NormalizedName = cmd.ItemName.NormalizeForSearch(),
+                    NormalizedLocation = cmd.Destination.NormalizeForSearch(),
                     UserId = _userContext.UserId
                 };
 
@@ -168,6 +169,7 @@ public class AwsStorageRepository : IStorageRepository
         if (!string.IsNullOrWhiteSpace(location))
         {
             item.Location = location!;
+            item.NormalizedLocation = location.NormalizeForSearch();
         }
 
         await _dbContext.SaveAsync(item);
