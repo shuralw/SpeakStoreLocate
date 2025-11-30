@@ -75,7 +75,9 @@
             <mat-icon>{{isRecording ? 'stop' : 'mic'}}</mat-icon>
           </button>
           <div class="recording-status" *ngIf="isRecording">
-            <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+            <div class="audio-level-container">
+              <div class="audio-level-bar" [style.width.%]="audioLevel"></div>
+            </div>
             <span>Aufnahme läuft...</span>
           </div>
         </div>
