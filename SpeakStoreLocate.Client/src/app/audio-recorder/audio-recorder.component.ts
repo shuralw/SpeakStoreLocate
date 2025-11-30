@@ -388,6 +388,15 @@ export class AudioRecorderComponent implements OnInit {
   }
 
   startEdit(row: PeriodicElement) {
+    // If already editing a different row, prompt user to save/cancel first
+    if (this.editingId && this.editingId !== row.id) {
+      const confirmed = window.confirm(
+        'Sie haben ungespeicherte Änderungen. Möchten Sie diese verwerfen und zur neuen Zeile wechseln?'
+      );
+      if (!confirmed) {
+        return; // User chose to stay on current edit
+      }
+    }
     this.editingId = row.id;
     this.editName = row.name;
     this.editLocation = row.location;
