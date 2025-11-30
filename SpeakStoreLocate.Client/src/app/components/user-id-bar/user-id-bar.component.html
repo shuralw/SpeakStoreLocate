@@ -6,21 +6,24 @@
   <span class="user-id-toolbar__spacer"></span>
 
   <ng-container *ngIf="currentUserId && !editMode; else userIdAction">
-    <mat-chip-set class="user-id-toolbar__chip-set" aria-label="Aktuelle User-ID">
-      <mat-chip color="accent" selected disableRipple>
-        <mat-icon>person</mat-icon>
-        {{ currentUserId }}
-      </mat-chip>
-    </mat-chip-set>
-    <button
-      mat-icon-button
-      type="button"
-      (click)="startEditing()"
-      matTooltip="User-ID ändern"
-      aria-label="User-ID ändern"
-    >
-      <mat-icon>edit</mat-icon>
-    </button>
+  <div class="user-id-toolbar__user" [attr.aria-label]="'Aktuelle User-ID: ' + currentUserId">
+      <div class="user-id-toolbar__user-chip">
+        <div class="user-id-toolbar__user-icon" aria-hidden="true">
+          <mat-icon>person</mat-icon>
+        </div>
+        <div class="user-id-toolbar__user-text">{{ currentUserId }}</div>
+      </div>
+      <button
+        class="user-id-toolbar__user-edit"
+        mat-icon-button
+        type="button"
+        (click)="startEditing()"
+        matTooltip="User-ID ändern"
+        aria-label="User-ID ändern"
+      >
+        <mat-icon>edit</mat-icon>
+      </button>
+    </div>
   </ng-container>
 </mat-toolbar>
 
