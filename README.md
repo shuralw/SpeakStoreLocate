@@ -16,11 +16,13 @@ A .NET application for speech transcription and storage management.
 
 - [.NET SDK 10.0](https://dotnet.microsoft.com/download/dotnet/10.0) or later
 - [Node.js 18.x](https://nodejs.org/) or later (for frontend)
+- Docker (optional, for container builds)
 - Git
 
 ## Getting Started
 
 ### Backend Setup
+
 ```bash
 git clone https://github.com/shuralw/SpeakStoreLocate.git
 cd SpeakStoreLocate
@@ -30,6 +32,7 @@ dotnet test SpeakStoreLocate.Tests/SpeakStoreLocate.Tests.csproj --configuration
 ```
 
 ### Frontend Setup
+
 ```bash
 cd SpeakStoreLocate.Client
 npm ci
@@ -40,61 +43,57 @@ npm test -- --watch=false --browsers=ChromeHeadless
 ### Run the Application
 
 **Backend API:**
+
 ```bash
 dotnet run --project SpeakStoreLocate.ApiService/SpeakStoreLocate.ApiService.csproj
 ```
 
 **Frontend:**
+
 ```bash
 cd SpeakStoreLocate.Client
 npm start
 ```
 
+## PR Preview Environments (Azure Container Apps)
+
+Every Pull Request gets its own isolated preview environment deployed to Azure Container Apps. The workflow builds and pushes the API + Client Docker images and posts the preview URLs as a PR comment.
+
+### Documentation
+
+- **Setup / Checklist**: [.github/PR_PREVIEW_CHECKLIST.md](.github/PR_PREVIEW_CHECKLIST.md)
+- **Full documentation**: [docs/PR_PREVIEW_ENVIRONMENTS.md](docs/PR_PREVIEW_ENVIRONMENTS.md)
+
+### Required GitHub Secrets
+
+- `AZURE_CREDENTIALS` (Service Principal JSON)
+- `AZURE_RESOURCE_GROUP` (e.g. `speakstorelocate`)
+
+## Docker
+
+Build the API Docker image:
+
+```bash
+docker build -f SpeakStoreLocate.ApiService/dockerfile -t speakstorelocate-apiservice:local .
+```
+
+Build the client Docker image:
+
+```bash
+docker build -f SpeakStoreLocate.Client/dockerfile -t speakstorelocate-client:local .
+```
+
+## Deployment
+
+### Production (AWS App Runner)
+
+Production deployments to AWS App Runner are triggered automatically on push to the `master` branch.
+
+See [.github/workflows/deploy.yml](.github/workflows/deploy.yml) for details.
+
 ## Contributing
 
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on:
-- Development setup
-- Building and testing
-- Pull request process
-- Code style guidelines
-
-### Pull Request Requirements
-
-All pull requests to the `master` branch must pass automated build validation:
-
-**Backend PRs:**
-- ✅ Backend code must build successfully
-- ✅ All backend tests must pass
-- ✅ Docker image validation (if Dockerfile exists)
-
-**Frontend PRs:**
-- ✅ Frontend code must build successfully
-- ✅ All frontend tests must pass
-
-The PR build validation workflow intelligently detects which parts of the codebase changed and runs the appropriate validation. See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
-
-## Branch Protection
-
-The `master` branch is protected to ensure production stability. All changes must:
-1. Go through a pull request
-2. Pass automated build validation
-3. Have all status checks succeed
-
-For detailed information about branch protection settings, see [Branch Protection Configuration](.github/BRANCH_PROTECTION.md).
-
-## Development
-
-### Project Technologies
-- **Backend**: .NET 10.0, ASP.NET Core
-- **Frontend**: Angular 15, TypeScript
-- **Deployment**: AWS App Runner, Docker
-- **CI/CD**: GitHub Actions
-
-### CI/CD
-- **PR Build Validation** - Separate validation for backend and frontend changes
-  - Backend: .NET build and tests, Docker validation
-  - Frontend: Angular build and Karma tests
-- **Deployment** - Automatically deploys backend to AWS App Runner on merges to master
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
@@ -104,4 +103,3 @@ For detailed information about branch protection settings, see [Branch Protectio
 
 For questions or issues:
 - Open an [issue](https://github.com/shuralw/SpeakStoreLocate/issues)
-- See [Contributing Guidelines](CONTRIBUTING.md)

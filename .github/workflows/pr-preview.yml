@@ -33,20 +33,21 @@ jobs:
       - name: Deploy to Fly.io
         id: deploy
         run: |
-          # Deploy the app with a unique name for this PR
+          # Check if app exists, create if not
+          if ! flyctl status --app ${{ steps.app-name.outputs.app_name }} 2>/dev/null; then
+            echo "Creating new Fly.io app: ${{ steps.app-name.outputs.app_name }}"
+            flyctl apps create ${{ steps.app-name.outputs.app_name }} --org ${{ env.FLY_ORG }}
+          else
+            echo "App already exists: ${{ steps.app-name.outputs.app_name }}"
+          fi
+          
+          # Deploy the app
           flyctl deploy \
             --app ${{ steps.app-name.outputs.app_name }} \
             --config fly.toml \
             --build-arg ASPNETCORE_ENVIRONMENT=Production \
             --ha=false \
-            --remote-only \
-            || flyctl apps create ${{ steps.app-name.outputs.app_name }} --org ${{ env.FLY_ORG }} && \
-               flyctl deploy \
-                 --app ${{ steps.app-name.outputs.app_name }} \
-                 --config fly.toml \
-                 --build-arg ASPNETCORE_ENVIRONMENT=Production \
-                 --ha=false \
-                 --remote-only
+            --remote-only
 
       - name: Get deployment URL
         id: deployment-url
