@@ -14,6 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     # Only deploy on open/sync/reopen, not on close
     if: github.event.action != 'closed'
+    permissions:
+      contents: read
+      pull-requests: write
     
     steps:
       - name: Checkout code
@@ -115,6 +118,8 @@ jobs:
     runs-on: ubuntu-latest
     # Only cleanup when PR is closed
     if: github.event.action == 'closed'
+    permissions:
+      pull-requests: write
     
     steps:
       - name: Setup Fly CLI
