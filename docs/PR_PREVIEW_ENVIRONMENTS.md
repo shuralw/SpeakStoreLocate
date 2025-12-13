@@ -90,7 +90,7 @@ primary_region = "fra"  # Frankfurt
   dockerfile = "SpeakStoreLocate.ApiService/dockerfile"
 
 [env]
-  ASPNETCORE_ENVIRONMENT = "Production"
+  ASPNETCORE_ENVIRONMENT = "Staging"  # Preview environments use Staging
   ASPNETCORE_URLS = "http://+:8080"
 
 [http_service]
