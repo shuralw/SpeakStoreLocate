@@ -1,0 +1,161 @@
+name: PR Preview Deployment
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+env:
+  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+  FLY_ORG: ${{ secrets.FLY_ORG }}
+
+jobs:
+  deploy:
+    name: Deploy PR Preview
+    runs-on: ubuntu-latest
+    # Only deploy on open/sync/reopen, not on close
+    if: github.event.action != 'closed'
+    permissions:
+      contents: read
+      pull-requests: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Fly CLI
+        uses: superfly/flyctl-actions/setup-flyctl@1.4
+
+      - name: Generate app name
+        id: app-name
+        run: |
+          # Generate a unique app name based on PR number
+          APP_NAME="speakstorelocate-pr-${{ github.event.pull_request.number }}"
+          echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
+          echo "App name: $APP_NAME"
+
+      - name: Deploy to Fly.io
+        id: deploy
+        run: |
+          # Check if app exists, create if not
+          if ! flyctl status --app ${{ steps.app-name.outputs.app_name }} 2>/dev/null; then
+            echo "Creating new Fly.io app: ${{ steps.app-name.outputs.app_name }}"
+            flyctl apps create ${{ steps.app-name.outputs.app_name }} --org ${{ env.FLY_ORG }}
+          else
+            echo "App already exists: ${{ steps.app-name.outputs.app_name }}"
+          fi
+          
+          # Set environment for preview
+          flyctl secrets set ASPNETCORE_ENVIRONMENT=Staging \
+            --app ${{ steps.app-name.outputs.app_name }} --stage 2>/dev/null || true
+          
+          # Deploy the app
+          flyctl deploy \
+            --app ${{ steps.app-name.outputs.app_name }} \
+            --config fly.toml \
+            --ha=false \
+            --remote-only
+
+      - name: Get deployment URL
+        id: deployment-url
+        run: |
+          URL="https://${{ steps.app-name.outputs.app_name }}.fly.dev"
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "Deployment URL: $URL"
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const url = '${{ steps.deployment-url.outputs.url }}';
+            const appName = '${{ steps.app-name.outputs.app_name }}';
+            
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('Preview Environment')
+            );
+            
+            const commentBody = `## 🚀 Preview Environment Deployed
+            
+            Your preview environment is ready!
+            
+            - **URL**: ${url}
+            - **App Name**: \`${appName}\`
+            - **Status**: ✅ Deployed
+            
+            The preview environment will be automatically destroyed when this PR is closed or merged.
+            
+            ---
+            *Deployed via Fly.io • Updated: ${new Date().toISOString()}*`;
+            
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: commentBody
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: commentBody
+              });
+            }
+
+  cleanup:
+    name: Cleanup PR Preview
+    runs-on: ubuntu-latest
+    # Only cleanup when PR is closed
+    if: github.event.action == 'closed'
+    permissions:
+      pull-requests: write
+    
+    steps:
+      - name: Setup Fly CLI
+        uses: superfly/flyctl-actions/setup-flyctl@1.4
+
+      - name: Generate app name
+        id: app-name
+        run: |
+          APP_NAME="speakstorelocate-pr-${{ github.event.pull_request.number }}"
+          echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
+          echo "App name to delete: $APP_NAME"
+
+      - name: Delete Fly.io app
+        run: |
+          flyctl apps destroy ${{ steps.app-name.outputs.app_name }} --yes || echo "App does not exist or already deleted"
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const appName = '${{ steps.app-name.outputs.app_name }}';
+            
+            const commentBody = `## 🧹 Preview Environment Cleaned Up
+            
+            The preview environment has been destroyed.
+            
+            - **App Name**: \`${appName}\`
+            - **Status**: ❌ Deleted
+            
+            ---
+            *Cleaned up via Fly.io • ${new Date().toISOString()}*`;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: commentBody
+            });
