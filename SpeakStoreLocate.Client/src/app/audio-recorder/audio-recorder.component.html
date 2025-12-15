@@ -68,10 +68,7 @@
             class="record-button"
             (pointerdown)="onPointerDown($event)"
             (pointerup)="onPointerUp($event)"
-            (pointercancel)="onPointerCancel($event)"
-            (mousedown)="onMouseDown($event)"
-            (mouseup)="onMouseUp($event)"
-            (mouseleave)="onMouseLeave($event)">
+            (pointercancel)="onPointerCancel($event)">
             <mat-icon>{{isRecording ? 'stop' : 'mic'}}</mat-icon>
           </button>
           <div class="recording-status" *ngIf="isRecording">
