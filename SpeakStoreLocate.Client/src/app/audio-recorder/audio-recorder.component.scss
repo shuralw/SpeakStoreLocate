@@ -200,6 +200,7 @@
     width: 80px;
     height: 80px;
     transition: all 0.3s ease;
+    touch-action: none; /* Prevent scrolling while recording on mobile */
     
     &:hover {
       transform: scale(1.05);

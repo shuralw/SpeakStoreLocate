@@ -200,16 +200,6 @@ export class AudioRecorderComponent implements OnInit {
     // audioChunks NICHT leeren – sie werden in onRecordingStop() benötigt
     this.zone.run(() => this.isRecording = false);
   }
-  // Debug: Mouse events for troubleshooting
-  onMouseDown(evt: MouseEvent) {
-    console.log('[AudioRecorderComponent] onMouseDown', evt);
-  }
-  onMouseUp(evt: MouseEvent) {
-    console.log('[AudioRecorderComponent] onMouseUp', evt);
-  }
-  onMouseLeave(evt: MouseEvent) {
-    console.log('[AudioRecorderComponent] onMouseLeave', evt);
-  }
 
   private async onRecordingStop() {
     // Blob bauen
