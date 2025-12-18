@@ -452,7 +452,7 @@ export class AudioRecorderComponent implements OnInit {
     if (this.editingId && this.editingId !== row.id) {
       const hasUnsaved = (this.editName !== this.editingOriginalName) || 
                          (this.editLocation !== this.editingOriginalLocation) ||
-                         (JSON.stringify(this.editTags) !== JSON.stringify(this.editingOriginalTags));
+                         !this.areArraysEqual(this.editTags, this.editingOriginalTags);
       if (hasUnsaved) {
         const proceed = window.confirm('Es gibt ungespeicherte Änderungen. Wirklich wechseln und Änderungen verwerfen?');
         if (!proceed) {
@@ -528,5 +528,12 @@ export class AudioRecorderComponent implements OnInit {
     if (index >= 0) {
       this.editTags.splice(index, 1);
     }
+  }
+
+  private areArraysEqual(a: string[], b: string[]): boolean {
+    if (a.length !== b.length) return false;
+    const sortedA = [...a].sort();
+    const sortedB = [...b].sort();
+    return sortedA.every((val, idx) => val === sortedB[idx]);
   }
 }

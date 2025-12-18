@@ -64,10 +64,10 @@ public class StorageController : ControllerBase
 
         var items = await this._storageRepository.GetStorageItems();
         
-        // Filter by tag if specified
+        // Filter by tag if specified (supports partial matching, case-insensitive)
         if (!string.IsNullOrWhiteSpace(tag))
         {
-            items = items.Where(item => item.Tags != null && item.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase));
+            items = items.Where(item => item.Tags != null && item.Tags.Any(t => t.Contains(tag, StringComparison.OrdinalIgnoreCase)));
         }
         
         return items;
