@@ -12,6 +12,7 @@ export interface PeriodicElement {
   id: string;
   location: string;
   name: string;
+  tags?: string[];
 }
 
 export interface PendingUpload {
@@ -32,9 +33,10 @@ export class AudioRecorderComponent implements OnInit {
   // Base URL is provided via Angular environments for dev/prod
   private readonly API_BASE = environment.apiBase;
   dataSource = new MatTableDataSource<PeriodicElement>([]);
-  displayedColumns = ['location', 'name', 'actions'];
+  displayedColumns = ['location', 'name', 'tags', 'actions'];
   filterNameControl = new FormControl('');
   filterLocationControl = new FormControl('');
+  filterTagControl = new FormControl('');
   @ViewChild(MatSort) sort?: MatSort;
   // Filters visibility toggle (default hidden)
   showFilters = false;
@@ -56,8 +58,11 @@ export class AudioRecorderComponent implements OnInit {
   editingId?: string;
   editName: string = '';
   editLocation: string = '';
+  editTags: string[] = [];
+  editTagInput: string = '';
   private editingOriginalName: string = '';
   private editingOriginalLocation: string = '';
+  private editingOriginalTags: string[] = [];
 
   constructor(private http: HttpClient, private zone: NgZone) { }
 
@@ -399,11 +404,12 @@ export class AudioRecorderComponent implements OnInit {
       const raw = await firstValueFrom(
         this.http.get<any[]>(`${this.API_BASE}`)
       );
-      // Map API (Id/Name/Location) to client model (id/name/location)
+      // Map API (Id/Name/Location/Tags) to client model (id/name/location/tags)
       return (raw ?? []).map(x => ({
         id: x.id ?? x.Id,
         name: x.name ?? x.Name,
         location: x.location ?? x.Location,
+        tags: x.tags ?? x.Tags ?? [],
       } as PeriodicElement));
     } catch {
       this.showResult(false, 'Tabelle konnte nicht geladen werden.');
@@ -412,15 +418,17 @@ export class AudioRecorderComponent implements OnInit {
   }
 
   private setupFilters() {
-    // Column-specific filtering using two controls. We encode both values into one trigger string,
+    // Column-specific filtering using controls. We encode all values into one trigger string,
     // but actually read the controls inside the predicate.
     this.dataSource.filterPredicate = (data: PeriodicElement, _filter: string) => {
       const nameTerm = (this.filterNameControl.value ?? '').toString().trim().toLowerCase();
       const locTerm = (this.filterLocationControl.value ?? '').toString().trim().toLowerCase();
+      const tagTerm = (this.filterTagControl.value ?? '').toString().trim().toLowerCase();
 
       const nameMatch = !nameTerm || (data.name ?? '').toLowerCase().includes(nameTerm);
       const locMatch = !locTerm || (data.location ?? '').toLowerCase().includes(locTerm);
-      return nameMatch && locMatch;
+      const tagMatch = !tagTerm || (data.tags ?? []).some(tag => tag.toLowerCase().includes(tagTerm));
+      return nameMatch && locMatch && tagMatch;
     };
 
     const apply = () => {
@@ -431,6 +439,7 @@ export class AudioRecorderComponent implements OnInit {
     apply();
     this.filterNameControl.valueChanges.subscribe(() => apply());
     this.filterLocationControl.valueChanges.subscribe(() => apply());
+    this.filterTagControl.valueChanges.subscribe(() => apply());
   }
 
   toggleFilters() {
@@ -441,7 +450,9 @@ export class AudioRecorderComponent implements OnInit {
   startEdit(row: PeriodicElement) {
     // If already editing another row and unsaved changes exist -> confirm
     if (this.editingId && this.editingId !== row.id) {
-      const hasUnsaved = (this.editName !== this.editingOriginalName) || (this.editLocation !== this.editingOriginalLocation);
+      const hasUnsaved = (this.editName !== this.editingOriginalName) || 
+                         (this.editLocation !== this.editingOriginalLocation) ||
+                         (JSON.stringify(this.editTags) !== JSON.stringify(this.editingOriginalTags));
       if (hasUnsaved) {
         const proceed = window.confirm('Es gibt ungespeicherte Änderungen. Wirklich wechseln und Änderungen verwerfen?');
         if (!proceed) {
@@ -453,16 +464,22 @@ export class AudioRecorderComponent implements OnInit {
     this.editingId = row.id;
     this.editName = row.name;
     this.editLocation = row.location;
+    this.editTags = [...(row.tags ?? [])];
+    this.editTagInput = '';
     this.editingOriginalName = row.name;
     this.editingOriginalLocation = row.location;
+    this.editingOriginalTags = [...(row.tags ?? [])];
   }
 
   cancelEdit() {
     this.editingId = undefined;
     this.editName = '';
     this.editLocation = '';
+    this.editTags = [];
+    this.editTagInput = '';
     this.editingOriginalName = '';
     this.editingOriginalLocation = '';
+    this.editingOriginalTags = [];
   }
 
   async saveEdit(row: PeriodicElement) {
@@ -474,13 +491,14 @@ export class AudioRecorderComponent implements OnInit {
     }
 
     try {
-      const body = { name: trimmedName, location: trimmedLocation };
+      const body = { name: trimmedName, location: trimmedLocation, tags: this.editTags };
       await firstValueFrom(this.http.put(`${this.API_BASE}/${row.id}`, body));
       this.showResult(true, 'Eintrag aktualisiert.');
       this.cancelEdit();
       // After successful save, originals reset
       this.editingOriginalName = '';
       this.editingOriginalLocation = '';
+      this.editingOriginalTags = [];
       await this.loadTableAsync();
     } catch (err) {
       const httpError = err as HttpErrorResponse | undefined;
@@ -489,6 +507,26 @@ export class AudioRecorderComponent implements OnInit {
         return;
       }
       this.showResult(false, 'Fehler beim Aktualisieren.');
+    }
+  }
+
+  addTag(event?: KeyboardEvent) {
+    if (event && event.key !== 'Enter') {
+      return;
+    }
+    event?.preventDefault();
+    
+    const tag = this.editTagInput.trim();
+    if (tag && !this.editTags.includes(tag)) {
+      this.editTags.push(tag);
+      this.editTagInput = '';
+    }
+  }
+
+  removeTag(tag: string) {
+    const index = this.editTags.indexOf(tag);
+    if (index >= 0) {
+      this.editTags.splice(index, 1);
     }
   }
 }
