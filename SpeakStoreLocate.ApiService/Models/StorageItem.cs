@@ -11,4 +11,5 @@ public class StorageItem
     [DynamoDBProperty] public string Location { get; set; }
     [DynamoDBProperty] public string NormalizedLocation { get; set; }
     [DynamoDBProperty] public string UserId { get; set; }
+    [DynamoDBProperty] public List<string>? Tags { get; set; }
 }

@@ -37,7 +37,7 @@ public class StorageController : ControllerBase
 
     [HttpGet]
     [EnableCors("DefaultCorsPolicy")]
-    public async Task<IEnumerable<StorageItem>> GetItemsAsync()
+    public async Task<IEnumerable<StorageItem>> GetItemsAsync([FromQuery] string? tag = null)
     {
         var origin = Request.Headers.Origin.FirstOrDefault();
         var userAgent = Request.Headers.UserAgent.FirstOrDefault();
@@ -62,7 +62,15 @@ public class StorageController : ControllerBase
         Response.Headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS";
         Response.Headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-User-Id";
 
-        return await this._storageRepository.GetStorageItems();
+        var items = await this._storageRepository.GetStorageItems();
+        
+        // Filter by tag if specified (supports partial matching, case-insensitive)
+        if (!string.IsNullOrWhiteSpace(tag))
+        {
+            items = items.Where(item => item.Tags != null && item.Tags.Any(t => t.Contains(tag, StringComparison.OrdinalIgnoreCase)));
+        }
+        
+        return items;
     }
 
     [HttpOptions]
@@ -107,6 +115,7 @@ public class StorageController : ControllerBase
     {
         public string? Name { get; set; }
         public string? Location { get; set; }
+        public List<string>? Tags { get; set; }
     }
 
     [HttpPut("{id}")]
@@ -118,12 +127,12 @@ public class StorageController : ControllerBase
             return BadRequest("Invalid request body");
         }
 
-        if (string.IsNullOrWhiteSpace(request.Name) && string.IsNullOrWhiteSpace(request.Location))
+        if (string.IsNullOrWhiteSpace(request.Name) && string.IsNullOrWhiteSpace(request.Location) && request.Tags == null)
         {
             return BadRequest("No fields to update");
         }
 
-        var updated = await _storageRepository.UpdateStorageItemAsync(id, request.Name, request.Location);
+        var updated = await _storageRepository.UpdateStorageItemAsync(id, request.Name, request.Location, request.Tags);
         if (updated == null)
         {
             return NotFound();

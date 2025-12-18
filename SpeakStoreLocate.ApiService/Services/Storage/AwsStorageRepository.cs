@@ -143,7 +143,7 @@ public class AwsStorageRepository : IStorageRepository
         return distinctLocations;
     }
 
-    public async Task<StorageItem?> UpdateStorageItemAsync(string id, string? name, string? location)
+    public async Task<StorageItem?> UpdateStorageItemAsync(string id, string? name, string? location, List<string>? tags = null)
     {
         // Load item by hash key (Id)
         var item = await _dbContext.LoadAsync<StorageItem>(id);
@@ -171,11 +171,15 @@ public class AwsStorageRepository : IStorageRepository
             item.Location = location!;
             item.NormalizedLocation = location.NormalizeForSearch();
         }
+        if (tags != null)
+        {
+            item.Tags = tags;
+        }
 
         await _dbContext.SaveAsync(item);
 
-        _logger.LogInformation("Item {ItemId} updated. Name={Name}, Location: {OldLoc} -> {NewLoc}",
-            item.Id, item.Name, originalLocation, item.Location);
+        _logger.LogInformation("Item {ItemId} updated. Name={Name}, Location: {OldLoc} -> {NewLoc}, Tags={Tags}",
+            item.Id, item.Name, originalLocation, item.Location, tags != null ? string.Join(", ", tags) : "unchanged");
 
         return item;
     }

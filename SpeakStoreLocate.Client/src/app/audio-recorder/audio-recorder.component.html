@@ -102,7 +102,7 @@
         </div>
       </mat-card-header>
       <mat-card-content>
-        <div *ngIf="showFilters" class="table-toolbar" style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; align-items:center; margin-bottom:12px;">
+        <div *ngIf="showFilters" class="table-toolbar" style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; align-items:center; margin-bottom:12px;">
           <mat-form-field appearance="outline">
             <mat-label>Filter Ort</mat-label>
             <input matInput [formControl]="filterLocationControl" placeholder="z.B. Küche">
@@ -114,6 +114,13 @@
             <mat-label>Filter Name</mat-label>
             <input matInput [formControl]="filterNameControl" placeholder="z.B. Schrauben">
             <button *ngIf="filterNameControl.value" matSuffix mat-icon-button aria-label="Clear" (click)="filterNameControl.setValue('')">
+              <mat-icon>close</mat-icon>
+            </button>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Filter Tags</mat-label>
+            <input matInput [formControl]="filterTagControl" placeholder="z.B. Werkzeug">
+            <button *ngIf="filterTagControl.value" matSuffix mat-icon-button aria-label="Clear" (click)="filterTagControl.setValue('')">
               <mat-icon>close</mat-icon>
             </button>
           </mat-form-field>
@@ -140,6 +147,32 @@
                 </mat-form-field>
               </ng-container>
               <ng-template #viewLocation>{{element.location}}</ng-template>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="tags">
+            <th mat-header-cell *matHeaderCellDef>Tags</th>
+            <td mat-cell *matCellDef="let element">
+              <ng-container *ngIf="editingId === element.id; else viewTags">
+                <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
+                  <mat-chip-set aria-label="Tags">
+                    <mat-chip *ngFor="let tag of editTags" [removable]="true" (removed)="removeTag(tag)">
+                      {{tag}}
+                      <mat-icon matChipRemove>cancel</mat-icon>
+                    </mat-chip>
+                  </mat-chip-set>
+                  <mat-form-field appearance="outline" style="flex: 1; min-width: 120px;">
+                    <input matInput placeholder="Neuer Tag" [(ngModel)]="editTagInput" (keydown)="addTag($event)">
+                    <button mat-icon-button matSuffix (click)="addTag()" *ngIf="editTagInput" aria-label="Tag hinzufügen">
+                      <mat-icon>add</mat-icon>
+                    </button>
+                  </mat-form-field>
+                </div>
+              </ng-container>
+              <ng-template #viewTags>
+                <mat-chip-set aria-label="Tags" *ngIf="element.tags && element.tags.length > 0">
+                  <mat-chip *ngFor="let tag of element.tags">{{tag}}</mat-chip>
+                </mat-chip-set>
+              </ng-template>
             </td>
           </ng-container>
           <ng-container matColumnDef="actions">
