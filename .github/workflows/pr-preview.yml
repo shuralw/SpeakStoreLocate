@@ -1,64 +1,125 @@
-name: PR Preview Deployment
+name: PR Preview Deployment (Azure)
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, closed]
 
 env:
-  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-  FLY_ORG: ${{ secrets.FLY_ORG }}
+  RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+  LOCATION: westeurope
 
 jobs:
   deploy:
     name: Deploy PR Preview
     runs-on: ubuntu-latest
-    # Only deploy on open/sync/reopen, not on close
     if: github.event.action != 'closed'
     permissions:
       contents: read
       pull-requests: write
+      id-token: write
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Fly CLI
-        uses: superfly/flyctl-actions/setup-flyctl@1.4
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Generate app name
         id: app-name
         run: |
-          # Generate a unique app name based on PR number
+          # Generate unique app name based on PR number
           APP_NAME="speakstorelocate-pr-${{ github.event.pull_request.number }}"
           echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
           echo "App name: $APP_NAME"
 
-      - name: Deploy to Fly.io
+      - name: Create or update Container App
         id: deploy
         run: |
-          # Check if app exists, create if not
-          if ! flyctl status --app ${{ steps.app-name.outputs.app_name }} 2>/dev/null; then
-            echo "Creating new Fly.io app: ${{ steps.app-name.outputs.app_name }}"
-            flyctl apps create ${{ steps.app-name.outputs.app_name }} --org ${{ env.FLY_ORG }}
-          else
-            echo "App already exists: ${{ steps.app-name.outputs.app_name }}"
+          APP_NAME="${{ steps.app-name.outputs.app_name }}"
+          RG="${{ env.RESOURCE_GROUP }}"
+          LOCATION="${{ env.LOCATION }}"
+          
+          # Check if Container App Environment exists, create if not
+          ENV_NAME="speakstorelocate-env"
+          if ! az containerapp env show --name $ENV_NAME --resource-group $RG 2>/dev/null; then
+            echo "Creating Container App Environment: $ENV_NAME"
+            az containerapp env create \
+              --name $ENV_NAME \
+              --resource-group $RG \
+              --location $LOCATION
           fi
           
-          # Set environment for preview
-          flyctl secrets set ASPNETCORE_ENVIRONMENT=Staging \
-            --app ${{ steps.app-name.outputs.app_name }} --stage 2>/dev/null || true
+          # Check if Container App exists
+          if az containerapp show --name $APP_NAME --resource-group $RG 2>/dev/null; then
+            echo "Updating existing Container App: $APP_NAME"
+            az containerapp update \
+              --name $APP_NAME \
+              --resource-group $RG \
+              --image mcr.microsoft.com/azuredocs/containerapps-helloworld:latest \
+              --set-env-vars ASPNETCORE_ENVIRONMENT=Staging
+          else
+            echo "Creating new Container App: $APP_NAME"
+            az containerapp create \
+              --name $APP_NAME \
+              --resource-group $RG \
+              --environment $ENV_NAME \
+              --image mcr.microsoft.com/azuredocs/containerapps-helloworld:latest \
+              --target-port 8080 \
+              --ingress external \
+              --env-vars ASPNETCORE_ENVIRONMENT=Staging \
+              --min-replicas 0 \
+              --max-replicas 1
+          fi
+
+      - name: Build and push Docker image
+        run: |
+          APP_NAME="${{ steps.app-name.outputs.app_name }}"
+          RG="${{ env.RESOURCE_GROUP }}"
           
-          # Deploy the app
-          flyctl deploy \
-            --app ${{ steps.app-name.outputs.app_name }} \
-            --config fly.toml \
-            --ha=false \
-            --remote-only
+          # Get ACR login server
+          ACR_NAME=$(az acr list --resource-group $RG --query "[0].name" -o tsv)
+          if [ -z "$ACR_NAME" ]; then
+            echo "Creating Azure Container Registry..."
+            ACR_NAME="speakstorelocateacr$(date +%s | tail -c 6)"
+            az acr create \
+              --resource-group $RG \
+              --name $ACR_NAME \
+              --sku Basic \
+              --location ${{ env.LOCATION }}
+          fi
+          
+          ACR_LOGIN_SERVER=$(az acr show --name $ACR_NAME --resource-group $RG --query loginServer -o tsv)
+          
+          # Login to ACR
+          az acr login --name $ACR_NAME
+          
+          # Build and push
+          IMAGE_NAME="$ACR_LOGIN_SERVER/$APP_NAME:${{ github.sha }}"
+          docker build -f SpeakStoreLocate.ApiService/dockerfile -t $IMAGE_NAME .
+          docker push $IMAGE_NAME
+          
+          # Update container app with new image
+          az containerapp update \
+            --name $APP_NAME \
+            --resource-group $RG \
+            --image $IMAGE_NAME
 
       - name: Get deployment URL
         id: deployment-url
         run: |
-          URL="https://${{ steps.app-name.outputs.app_name }}.fly.dev"
+          APP_NAME="${{ steps.app-name.outputs.app_name }}"
+          RG="${{ env.RESOURCE_GROUP }}"
+          
+          FQDN=$(az containerapp show \
+            --name $APP_NAME \
+            --resource-group $RG \
+            --query properties.configuration.ingress.fqdn \
+            -o tsv)
+          
+          URL="https://$FQDN"
           echo "url=$URL" >> $GITHUB_OUTPUT
           echo "Deployment URL: $URL"
 
@@ -70,7 +131,6 @@ jobs:
             const url = '${{ steps.deployment-url.outputs.url }}';
             const appName = '${{ steps.app-name.outputs.app_name }}';
             
-            // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -79,24 +139,23 @@ jobs:
             
             const botComment = comments.find(comment => 
               comment.user.type === 'Bot' && 
-              comment.body.includes('Preview Environment')
+              comment.body.includes('Preview-Umgebung')
             );
             
-            const commentBody = `## 🚀 Preview Environment Deployed
+            const commentBody = `## 🚀 Preview-Umgebung bereitgestellt
             
-            Your preview environment is ready!
+            Ihre Preview-Umgebung ist bereit!
             
             - **URL**: ${url}
-            - **App Name**: \`${appName}\`
-            - **Status**: ✅ Deployed
+            - **App-Name**: \`${appName}\`
+            - **Status**: ✅ Bereitgestellt
             
-            The preview environment will be automatically destroyed when this PR is closed or merged.
+            Die Preview-Umgebung wird automatisch gelöscht, wenn dieser PR geschlossen oder gemergt wird.
             
             ---
-            *Deployed via Fly.io • Updated: ${new Date().toISOString()}*`;
+            *Bereitgestellt via Azure Container Apps • Aktualisiert: ${new Date().toISOString()}*`;
             
             if (botComment) {
-              // Update existing comment
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -104,7 +163,6 @@ jobs:
                 body: commentBody
               });
             } else {
-              // Create new comment
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -116,14 +174,16 @@ jobs:
   cleanup:
     name: Cleanup PR Preview
     runs-on: ubuntu-latest
-    # Only cleanup when PR is closed
     if: github.event.action == 'closed'
     permissions:
       pull-requests: write
+      id-token: write
     
     steps:
-      - name: Setup Fly CLI
-        uses: superfly/flyctl-actions/setup-flyctl@1.4
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Generate app name
         id: app-name
@@ -132,9 +192,15 @@ jobs:
           echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
           echo "App name to delete: $APP_NAME"
 
-      - name: Delete Fly.io app
+      - name: Delete Container App
         run: |
-          flyctl apps destroy ${{ steps.app-name.outputs.app_name }} --yes || echo "App does not exist or already deleted"
+          APP_NAME="${{ steps.app-name.outputs.app_name }}"
+          RG="${{ env.RESOURCE_GROUP }}"
+          
+          az containerapp delete \
+            --name $APP_NAME \
+            --resource-group $RG \
+            --yes || echo "App does not exist or already deleted"
 
       - name: Comment on PR
         uses: actions/github-script@v7
@@ -143,15 +209,15 @@ jobs:
             const prNumber = context.payload.pull_request.number;
             const appName = '${{ steps.app-name.outputs.app_name }}';
             
-            const commentBody = `## 🧹 Preview Environment Cleaned Up
+            const commentBody = `## 🧹 Preview-Umgebung bereinigt
             
-            The preview environment has been destroyed.
+            Die Preview-Umgebung wurde gelöscht.
             
-            - **App Name**: \`${appName}\`
-            - **Status**: ❌ Deleted
+            - **App-Name**: \`${appName}\`
+            - **Status**: ❌ Gelöscht
             
             ---
-            *Cleaned up via Fly.io • ${new Date().toISOString()}*`;
+            *Bereinigt via Azure Container Apps • ${new Date().toISOString()}*`;
             
             await github.rest.issues.createComment({
               owner: context.repo.owner,

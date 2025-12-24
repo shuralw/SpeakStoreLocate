@@ -1,93 +1,167 @@
-# PR Preview Environments - Setup Checklist
+# PR Preview-Umgebungen - Einrichtungs-Checkliste
 
-This checklist helps repository maintainers set up the automated PR preview environments.
+Diese Checkliste hilft Repository-Maintainern bei der Einrichtung der automatisierten PR Preview-Umgebungen.
 
-## Initial Setup (One-time)
+## Erstmalige Einrichtung
 
-### 1. Fly.io Account Setup
-- [ ] Create a Fly.io account at https://fly.io/app/sign-up
-- [ ] Create or identify your organization name
-- [ ] Note your organization name (e.g., "personal" or custom org name)
+### 1. Azure Account Einrichtung
+- [ ] Azure Account erstellen unter https://portal.azure.com
+- [ ] Aktives Azure-Abonnement haben oder erstellen
+- [ ] Abonnement-ID notieren
 
-### 2. Generate Fly.io API Token
-- [ ] Install Fly.io CLI (see [docs/PR_PREVIEW_SETUP.md](../docs/PR_PREVIEW_SETUP.md))
-- [ ] Login to Fly.io: `flyctl auth login`
-- [ ] Generate API token: `flyctl auth token`
-- [ ] Copy the token (you'll need it in the next step)
+### 2. Azure CLI installieren und anmelden
+- [ ] Azure CLI installieren (siehe [docs/PR_PREVIEW_SETUP.md](../docs/PR_PREVIEW_SETUP.md))
+- [ ] Bei Azure anmelden: `az login`
+- [ ] Richtiges Abonnement auswählen: `az account set --subscription {subscription-id}`
 
-### 3. Configure GitHub Secrets
-- [ ] Go to: Repository Settings → Secrets and variables → Actions
-- [ ] Click "New repository secret"
-- [ ] Add `FLY_API_TOKEN` with your Fly.io API token
-- [ ] Add `FLY_ORG` with your organization name
+### 3. Resource Group erstellen
+- [ ] Resource Group erstellen:
+  ```bash
+  az group create --name speakstorelocate-rg --location westeurope
+  ```
+- [ ] Erstellung bestätigen:
+  ```bash
+  az group show --name speakstorelocate-rg
+  ```
 
-### 4. Verify Configuration Files
-- [ ] Confirm `fly.toml` exists in repository root
-- [ ] Confirm `.github/workflows/pr-preview.yml` exists
-- [ ] Confirm Dockerfile exists at `SpeakStoreLocate.ApiService/dockerfile`
+### 4. Service Principal erstellen
+- [ ] Service Principal erstellen:
+  ```bash
+  az ad sp create-for-rbac \
+    --name "SpeakStoreLocate-PR-Preview" \
+    --role contributor \
+    --scopes /subscriptions/{subscription-id}/resourceGroups/speakstorelocate-rg \
+    --sdk-auth
+  ```
+- [ ] Komplette JSON-Ausgabe kopieren (wird für GitHub Secrets benötigt)
+- [ ] Service Principal ID notieren für spätere Referenz
 
-## Testing the Setup
+### 5. GitHub Secrets konfigurieren
+- [ ] Zu Repository navigieren: Settings → Secrets and variables → Actions
+- [ ] "New repository secret" klicken
+- [ ] `AZURE_CREDENTIALS` hinzufügen mit kompletter JSON-Ausgabe
+- [ ] `AZURE_RESOURCE_GROUP` hinzufügen mit Wert `speakstorelocate-rg`
 
-### 5. Create a Test PR
-- [ ] Create a test branch: `git checkout -b test/preview-env`
-- [ ] Make a small change (e.g., update README)
-- [ ] Commit and push: `git push origin test/preview-env`
-- [ ] Create a Pull Request on GitHub
+### 6. Konfigurationsdateien prüfen
+- [ ] Bestätigen, dass `.github/workflows/pr-preview.yml` existiert
+- [ ] Bestätigen, dass Dockerfile existiert unter `SpeakStoreLocate.ApiService/dockerfile`
+- [ ] Workflow-Datei auf korrekte Secrets-Namen prüfen
 
-### 6. Verify Workflow Execution
-- [ ] Navigate to: Actions tab in GitHub
-- [ ] Find "PR Preview Deployment" workflow
-- [ ] Wait for workflow to complete (~3-5 minutes)
-- [ ] Check for any errors in the workflow logs
+## Einrichtung testen
 
-### 7. Verify PR Comment
-- [ ] Go to your test Pull Request
-- [ ] Look for a comment with "🚀 Preview Environment Deployed"
-- [ ] Note the preview URL (e.g., `https://speakstorelocate-pr-1.fly.dev`)
+### 7. Test-PR erstellen
+- [ ] Test-Branch erstellen: `git checkout -b test/preview-env`
+- [ ] Kleine Änderung machen (z.B. README aktualisieren)
+- [ ] Committen und pushen:
+  ```bash
+  git add .
+  git commit -m "Test preview environment setup"
+  git push origin test/preview-env
+  ```
+- [ ] Pull Request auf GitHub erstellen
 
-### 8. Test Preview Environment
-- [ ] Click on the preview URL
-- [ ] Verify the application loads correctly
-- [ ] Test basic functionality
+### 8. Workflow-Ausführung überprüfen
+- [ ] Zum Actions-Tab in GitHub navigieren
+- [ ] "PR Preview Deployment (Azure)" Workflow finden
+- [ ] Warten, bis Workflow abgeschlossen ist (~5-8 Minuten)
+- [ ] Auf Fehler in den Workflow-Logs prüfen
 
-### 9. Test Cleanup
-- [ ] Close or merge the test PR
-- [ ] Wait for cleanup workflow to run (~1 minute)
-- [ ] Look for "🧹 Preview Environment Cleaned Up" comment
-- [ ] Verify app is deleted: `flyctl apps list` (optional)
+### 9. PR-Kommentar überprüfen
+- [ ] Zum Test-Pull-Request gehen
+- [ ] Nach Kommentar "🚀 Preview-Umgebung bereitgestellt" suchen
+- [ ] Preview-URL notieren (z.B. `https://speakstorelocate-pr-1.westeurope.azurecontainerapps.io`)
+
+### 10. Preview-Umgebung testen
+- [ ] Auf Preview-URL klicken
+- [ ] Prüfen, ob Anwendung korrekt lädt
+- [ ] Basis-Funktionalität testen
+- [ ] Überprüfen, dass die richtige Umgebung läuft (Staging)
+
+### 11. Bereinigung testen
+- [ ] Test-PR schließen oder mergen
+- [ ] Warten, bis Cleanup-Workflow läuft (~1 Minute)
+- [ ] Nach "🧹 Preview-Umgebung bereinigt" Kommentar suchen
+- [ ] Optional: App-Löschung verifizieren:
+  ```bash
+  az containerapp list --resource-group speakstorelocate-rg --output table
+  ```
 
 ## Troubleshooting
 
-If any step fails, consult:
-- [Quick Setup Guide](../docs/PR_PREVIEW_SETUP.md)
-- [Full Documentation](../docs/PR_PREVIEW_ENVIRONMENTS.md)
-- GitHub Actions logs
-- Fly.io logs: `flyctl logs --app speakstorelocate-pr-{NUMBER}`
+Falls ein Schritt fehlschlägt, konsultieren Sie:
+- [Schnellstart-Anleitung](../docs/PR_PREVIEW_SETUP.md)
+- [Vollständige Dokumentation](../docs/PR_PREVIEW_ENVIRONMENTS.md)
+- GitHub Actions Logs
+- Azure Container Apps Logs:
+  ```bash
+  az containerapp logs show \
+    --name speakstorelocate-pr-{NUMMER} \
+    --resource-group speakstorelocate-rg \
+    --follow
+  ```
 
-## Post-Setup
+### Häufige Probleme
 
-### Monitor Usage
-- [ ] Check Fly.io dashboard regularly for active apps
-- [ ] Monitor GitHub Actions usage
-- [ ] Clean up old preview apps if needed: `flyctl apps destroy <app-name> --yes`
+**Problem**: Service Principal-Erstellung schlägt fehl
+- **Lösung**: Stellen Sie sicher, dass Sie ausreichende Berechtigungen haben (Owner oder User Access Administrator)
 
-### Team Communication
-- [ ] Inform team about PR preview environments
-- [ ] Share documentation links
-- [ ] Provide usage examples
+**Problem**: Resource Group nicht gefunden
+- **Lösung**: Prüfen Sie den Namen und stellen Sie sicher, dass Sie im richtigen Abonnement sind
 
-## Success Criteria
+**Problem**: Workflow kann sich nicht bei Azure anmelden
+- **Lösung**: Überprüfen Sie `AZURE_CREDENTIALS` Secret auf Vollständigkeit und korrekte Formatierung
 
-✅ Setup is complete when:
-- GitHub Secrets are configured
-- Test PR triggers automatic deployment
-- Preview URL works and shows the application
-- Cleanup runs when PR is closed
-- Team members can access preview environments
+**Problem**: Docker Build schlägt fehl
+- **Lösung**: Testen Sie das Dockerfile lokal und prüfen Sie auf Syntax-Fehler
+
+## Nach der Einrichtung
+
+### Nutzung überwachen
+- [ ] Azure Portal regelmäßig auf aktive Apps prüfen
+- [ ] GitHub Actions Nutzung überwachen
+- [ ] Alte Preview-Apps bei Bedarf manuell löschen:
+  ```bash
+  az containerapp delete \
+    --name <app-name> \
+    --resource-group speakstorelocate-rg \
+    --yes
+  ```
+
+### Team-Kommunikation
+- [ ] Team über PR Preview-Umgebungen informieren
+- [ ] Dokumentations-Links teilen
+- [ ] Verwendungsbeispiele bereitstellen
+- [ ] Best Practices kommunizieren
+
+### Kosten überwachen
+- [ ] Azure Cost Management + Billing im Portal öffnen
+- [ ] Budget-Alerts einrichten (empfohlen)
+- [ ] Monatliche Kosten für Resource Group überwachen
+- [ ] Ungenutzte Ressourcen regelmäßig bereinigen
+
+## Erfolgskriterien
+
+✅ Die Einrichtung ist abgeschlossen, wenn:
+- GitHub Secrets korrekt konfiguriert sind
+- Test-PR automatisches Deployment auslöst
+- Preview-URL funktioniert und zeigt die Anwendung
+- Bereinigung läuft, wenn PR geschlossen wird
+- Team-Mitglieder können auf Preview-Umgebungen zugreifen
+- Keine Fehler in den Workflow-Logs auftreten
 
 ## Support
 
-For issues or questions:
-- Check [docs/PR_PREVIEW_ENVIRONMENTS.md](../docs/PR_PREVIEW_ENVIRONMENTS.md)
-- Review GitHub Actions workflow logs
-- Contact Fly.io support: https://community.fly.io/
+Bei Problemen oder Fragen:
+- Dokumentation prüfen: [docs/PR_PREVIEW_ENVIRONMENTS.md](../docs/PR_PREVIEW_ENVIRONMENTS.md)
+- GitHub Actions Workflow-Logs überprüfen
+- Azure Portal Logs und Metriken einsehen
+- Azure Support kontaktieren: https://azure.microsoft.com/support/
+
+## Weiterführende Schritte
+
+Nach erfolgreicher Einrichtung:
+- [ ] Produktions-Deployment separat konfigurieren
+- [ ] Azure Application Insights für Monitoring einrichten
+- [ ] Azure Key Vault für Secrets-Management nutzen
+- [ ] Custom Domain für Preview-Umgebungen konfigurieren (optional)
+- [ ] Azure AD Authentication hinzufügen (optional)

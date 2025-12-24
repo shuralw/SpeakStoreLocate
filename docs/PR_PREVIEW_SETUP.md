@@ -1,55 +1,98 @@
-# PR Preview Environments - Quick Setup Guide
+# PR Preview-Umgebungen - Schnellstart-Anleitung
 
-## Prerequisites
+Diese Anleitung hilft Repository-Maintainern beim Einrichten der automatisierten PR Preview-Umgebungen mit Azure Container Apps.
 
-1. **Fly.io Account**
-   - Sign up at [fly.io](https://fly.io/app/sign-up)
-   - Create or use an existing organization
+## Voraussetzungen
 
-2. **Install Fly.io CLI** (for testing)
+1. **Azure Account**
+   - Registrieren Sie sich unter [Azure Portal](https://portal.azure.com)
+   - Stellen Sie sicher, dass Sie ein aktives Abonnement haben
+
+2. **Azure CLI installieren**
    ```bash
-   # macOS/Linux
-   curl -L https://fly.io/install.sh | sh
-
-   # Windows (PowerShell)
-   iwr https://fly.io/install.ps1 -useb | iex
+   # Windows (PowerShell als Administrator)
+   Invoke-WebRequest -Uri https://aka.ms/installazurecliwindows -OutFile .\AzureCLI.msi
+   Start-Process msiexec.exe -Wait -ArgumentList '/I AzureCLI.msi /quiet'
+   
+   # macOS
+   brew update && brew install azure-cli
+   
+   # Linux (Ubuntu/Debian)
+   curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
    ```
 
-3. **Generate Fly.io API Token**
+3. **Bei Azure anmelden**
    ```bash
-   flyctl auth login
-   flyctl auth token
+   az login
    ```
 
-## GitHub Repository Setup
+## Einrichtung in 5 Schritten
 
-### Step 1: Add Repository Secrets
+### Schritt 1: Resource Group erstellen
 
-Navigate to: `Settings` → `Secrets and variables` → `Actions` → `New repository secret`
+Erstellen Sie eine Resource Group für die Preview-Umgebungen:
 
-Add the following secrets:
+```bash
+az group create \
+  --name speakstorelocate-rg \
+  --location westeurope
+```
 
-| Secret Name | Description | How to Get |
-|------------|-------------|------------|
-| `FLY_API_TOKEN` | Fly.io API token for authentication | Run `flyctl auth token` |
-| `FLY_ORG` | Your Fly.io organization name | Found in Fly.io dashboard or use `personal` |
+### Schritt 2: Service Principal erstellen
 
-### Step 2: Verify Configuration Files
+Erstellen Sie einen Service Principal für GitHub Actions:
 
-Ensure these files exist in your repository:
+```bash
+# Ersetzen Sie {subscription-id} mit Ihrer Subscription ID
+az ad sp create-for-rbac \
+  --name "SpeakStoreLocate-PR-Preview" \
+  --role contributor \
+  --scopes /subscriptions/{subscription-id}/resourceGroups/speakstorelocate-rg \
+  --sdk-auth
+```
 
-1. **fly.toml** - Fly.io configuration
-2. **.github/workflows/pr-preview.yml** - GitHub Actions workflow
-3. **SpeakStoreLocate.ApiService/dockerfile** - Docker configuration
+**Wichtig**: Kopieren Sie die gesamte JSON-Ausgabe! Sie wird im nächsten Schritt benötigt.
 
-### Step 3: Test the Workflow
+Beispiel-Ausgabe:
+```json
+{
+  "clientId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "clientSecret": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "subscriptionId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "tenantId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  ...
+}
+```
 
-1. Create a feature branch:
+### Schritt 3: GitHub Secrets einrichten
+
+1. Gehen Sie zu Ihrem GitHub Repository
+2. Navigieren Sie zu: `Settings` → `Secrets and variables` → `Actions`
+3. Klicken Sie auf `New repository secret`
+4. Fügen Sie folgende Secrets hinzu:
+
+| Secret Name | Wert | Beschreibung |
+|------------|------|--------------|
+| `AZURE_CREDENTIALS` | Die komplette JSON-Ausgabe aus Schritt 2 | Für Azure-Authentifizierung |
+| `AZURE_RESOURCE_GROUP` | `speakstorelocate-rg` | Name der Resource Group |
+
+### Schritt 4: Konfigurationsdateien prüfen
+
+Stellen Sie sicher, dass folgende Dateien im Repository vorhanden sind:
+
+- ✅ `.github/workflows/pr-preview.yml` - Workflow für automatisches Deployment
+- ✅ `SpeakStoreLocate.ApiService/dockerfile` - Docker-Konfiguration
+
+### Schritt 5: Test durchführen
+
+Testen Sie die Einrichtung:
+
+1. Erstellen Sie einen Test-Branch:
    ```bash
    git checkout -b test/preview-environment
    ```
 
-2. Make a small change and push:
+2. Machen Sie eine kleine Änderung:
    ```bash
    echo "# Test" >> test.md
    git add test.md
@@ -57,97 +100,133 @@ Ensure these files exist in your repository:
    git push origin test/preview-environment
    ```
 
-3. Create a Pull Request on GitHub
+3. Erstellen Sie einen Pull Request auf GitHub
 
-4. Wait for the workflow to complete (~3-5 minutes)
+4. Warten Sie, bis der Workflow abgeschlossen ist (~5-8 Minuten)
 
-5. Look for a comment on the PR with the preview URL
+5. Überprüfen Sie den PR-Kommentar mit der Preview-URL
 
-## Expected Behavior
+## Erwartetes Verhalten
 
-### When PR is Opened/Updated
-- GitHub Actions workflow triggers
-- A new Fly.io app is created: `speakstorelocate-pr-{NUMBER}`
-- Application is deployed
-- Comment is posted/updated on PR with preview URL
+### Bei PR Öffnen/Aktualisieren
+- GitHub Actions Workflow wird ausgelöst
+- Eine neue Azure Container App wird erstellt: `speakstorelocate-pr-{NUMMER}`
+- Docker Image wird gebaut und nach Azure Container Registry gepusht
+- Anwendung wird deployed
+- Kommentar wird im PR gepostet/aktualisiert mit Preview-URL
 
-### When PR is Closed/Merged
-- GitHub Actions cleanup workflow triggers
-- Fly.io app is destroyed
-- Confirmation comment is posted on PR
+### Bei PR Schließen/Mergen
+- GitHub Actions Cleanup-Workflow wird ausgelöst
+- Azure Container App wird gelöscht
+- Bestätigungskommentar wird im PR gepostet
 
-## Preview URL Format
+## Preview-URL Format
 
 ```
-https://speakstorelocate-pr-{PR_NUMBER}.fly.dev
+https://speakstorelocate-pr-{PR_NUMMER}.westeurope.azurecontainerapps.io
 ```
 
-Examples:
-- PR #1: `https://speakstorelocate-pr-1.fly.dev`
-- PR #42: `https://speakstorelocate-pr-42.fly.dev`
+Beispiele:
+- PR #1: `https://speakstorelocate-pr-1.westeurope.azurecontainerapps.io`
+- PR #42: `https://speakstorelocate-pr-42.westeurope.azurecontainerapps.io`
 
 ## Troubleshooting
 
-### Workflow Fails with "Error: No token provided"
-- Ensure `FLY_API_TOKEN` secret is set correctly
-- Token must have appropriate permissions
+### Workflow schlägt fehl mit "Error: Az CLI Login failed"
+- Überprüfen Sie, ob `AZURE_CREDENTIALS` Secret korrekt gesetzt ist
+- Stellen Sie sicher, dass die JSON-Ausgabe vollständig ist
+- Prüfen Sie, ob der Service Principal noch existiert
 
-### Workflow Fails with "Error: Organization not found"
-- Verify `FLY_ORG` secret is set correctly
-- Check organization name in Fly.io dashboard
-
-### Deployment Succeeds but App Doesn't Start
-- Check Fly.io logs:
+### Workflow schlägt fehl mit "Resource Group not found"
+- Überprüfen Sie, ob `AZURE_RESOURCE_GROUP` Secret korrekt ist
+- Stellen Sie sicher, dass die Resource Group existiert:
   ```bash
-  flyctl logs --app speakstorelocate-pr-{PR_NUMBER}
+  az group show --name speakstorelocate-rg
   ```
-- Verify Dockerfile builds correctly locally:
+
+### Deployment erfolgreich, aber App startet nicht
+- Überprüfen Sie die Azure Container Apps Logs:
+  ```bash
+  az containerapp logs show \
+    --name speakstorelocate-pr-{PR_NUMMER} \
+    --resource-group speakstorelocate-rg \
+    --follow
+  ```
+- Prüfen Sie, ob das Dockerfile lokal funktioniert:
   ```bash
   docker build -f SpeakStoreLocate.ApiService/dockerfile .
+  docker run -p 8080:8080 <image-name>
   ```
 
-### Manual Cleanup (if needed)
+### Manuelle Bereinigung (falls nötig)
 ```bash
-# List all apps
-flyctl apps list
+# Alle Container Apps auflisten
+az containerapp list --resource-group speakstorelocate-rg --output table
 
-# Delete specific app
-flyctl apps destroy speakstorelocate-pr-{NUMBER} --yes
+# Spezifische App löschen
+az containerapp delete \
+  --name speakstorelocate-pr-{NUMMER} \
+  --resource-group speakstorelocate-rg \
+  --yes
 ```
 
-## Cost Considerations
+## Kostenüberlegungen
 
-### Fly.io Free Tier
-- 3 shared-cpu-1x VMs with 256MB RAM (free)
-- Up to 160GB outbound data transfer per month
-- Auto-stop when idle (no charges when stopped)
+### Azure Container Apps Free Tier
+- 180.000 vCPU-Sekunden pro Monat (kostenlos)
+- 360.000 GiB-Sekunden pro Monat (kostenlos)
+- Ausgehender Datenverkehr: Erste 5 GB kostenlos
 
-### Preview Environment Resources
-- **CPU**: 1 shared core
-- **RAM**: 1GB
-- **Storage**: Minimal (ephemeral)
-- **Auto-stop**: Enabled
+### Preview-Umgebung Ressourcen
+- **CPU**: 0.25 vCPU
+- **RAM**: 0.5 GB
+- **Storage**: Ephemeral (keine zusätzlichen Kosten)
+- **Scale to Zero**: Aktiviert
 
-### Cost Management Tips
-1. Close PRs when done (auto-cleanup runs)
-2. Set `auto_stop_machines = true` (already configured)
-3. Monitor active apps: `flyctl apps list`
-4. Manually cleanup old previews if needed
+### Kosten-Management Tipps
+1. Schließen Sie PRs, wenn fertig (automatische Bereinigung)
+2. `Scale to Zero` ist aktiviert (keine Kosten im Leerlauf)
+3. Überwachen Sie aktive Apps: `az containerapp list`
+4. Löschen Sie alte Previews manuell bei Bedarf
 
-## Security Notes
+## Sicherheitshinweise
 
-⚠️ **Important Security Considerations**:
+⚠️ **Wichtige Sicherheitsüberlegungen**:
 
-1. **Public Access**: Preview URLs are publicly accessible
-2. **No Production Data**: Never use production data in previews
-3. **Secrets Management**: Use GitHub Secrets or Fly.io Secrets
-4. **Environment Variables**: Set via Fly.io secrets:
+1. **Öffentlicher Zugriff**: Preview-URLs sind öffentlich zugänglich
+2. **Keine Produktionsdaten**: Verwenden Sie niemals Produktionsdaten in Previews
+3. **Secrets-Management**: Nutzen Sie GitHub Secrets oder Azure Key Vault
+4. **Service Principal**: Minimal erforderliche Berechtigungen vergeben
+5. **Umgebungsvariablen**: Über Azure Container Apps Secrets setzen:
    ```bash
-   flyctl secrets set KEY=value --app speakstorelocate-pr-{NUMBER}
+   az containerapp secret set \
+     --name speakstorelocate-pr-{NUMMER} \
+     --resource-group speakstorelocate-rg \
+     --secrets "key=value"
    ```
 
-## Additional Resources
+## Azure Portal Überwachung
 
-- [Full Documentation (German)](./PR_PREVIEW_ENVIRONMENTS.md)
-- [Fly.io Documentation](https://fly.io/docs/)
-- [GitHub Actions with Fly.io](https://fly.io/docs/app-guides/continuous-deployment-with-github-actions/)
+1. Öffnen Sie [Azure Portal](https://portal.azure.com)
+2. Navigieren Sie zur Resource Group `speakstorelocate-rg`
+3. Hier sehen Sie:
+   - Alle aktiven Container Apps (Preview-Umgebungen)
+   - Container App Environment
+   - Azure Container Registry
+   - Logs und Metriken
+
+## Zusätzliche Ressourcen
+
+- [Vollständige Dokumentation](./PR_PREVIEW_ENVIRONMENTS.md)
+- [Azure Container Apps Docs](https://learn.microsoft.com/en-us/azure/container-apps/)
+- [GitHub Actions mit Azure](https://docs.github.com/en/actions/deployment/deploying-to-azure)
+- [Azure CLI Referenz](https://learn.microsoft.com/en-us/cli/azure/)
+
+## Erfolg!
+
+✅ Die Einrichtung ist abgeschlossen, wenn:
+- GitHub Secrets konfiguriert sind
+- Test-PR automatisches Deployment auslöst
+- Preview-URL funktioniert und zeigt die Anwendung
+- Bereinigung läuft, wenn PR geschlossen wird
+- Team-Mitglieder können auf Preview-Umgebungen zugreifen
