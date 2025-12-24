@@ -35,12 +35,50 @@ jobs:
           echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
           echo "App name: $APP_NAME"
 
+      - name: Setup Azure Container Registry
+        id: setup-acr
+        run: |
+          RG="${{ env.RESOURCE_GROUP }}"
+          
+          # Get or create ACR with fixed name
+          ACR_NAME="speakstorelocateacr"
+          if ! az acr show --name $ACR_NAME --resource-group $RG 2>/dev/null; then
+            echo "Creating Azure Container Registry: $ACR_NAME"
+            az acr create \
+              --resource-group $RG \
+              --name $ACR_NAME \
+              --sku Basic \
+              --location ${{ env.LOCATION }}
+          fi
+          
+          ACR_LOGIN_SERVER=$(az acr show --name $ACR_NAME --resource-group $RG --query loginServer -o tsv)
+          echo "acr_name=$ACR_NAME" >> $GITHUB_OUTPUT
+          echo "acr_login_server=$ACR_LOGIN_SERVER" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        id: build-image
+        run: |
+          APP_NAME="${{ steps.app-name.outputs.app_name }}"
+          ACR_NAME="${{ steps.setup-acr.outputs.acr_name }}"
+          ACR_LOGIN_SERVER="${{ steps.setup-acr.outputs.acr_login_server }}"
+          
+          # Login to ACR
+          az acr login --name $ACR_NAME
+          
+          # Build and push
+          IMAGE_NAME="$ACR_LOGIN_SERVER/$APP_NAME:${{ github.sha }}"
+          docker build -f SpeakStoreLocate.ApiService/dockerfile -t $IMAGE_NAME .
+          docker push $IMAGE_NAME
+          
+          echo "image_name=$IMAGE_NAME" >> $GITHUB_OUTPUT
+
       - name: Create or update Container App
         id: deploy
         run: |
           APP_NAME="${{ steps.app-name.outputs.app_name }}"
           RG="${{ env.RESOURCE_GROUP }}"
           LOCATION="${{ env.LOCATION }}"
+          IMAGE_NAME="${{ steps.build-image.outputs.image_name }}"
           
           # Check if Container App Environment exists, create if not
           ENV_NAME="speakstorelocate-env"
@@ -58,7 +96,7 @@ jobs:
             az containerapp update \
               --name $APP_NAME \
               --resource-group $RG \
-              --image mcr.microsoft.com/azuredocs/containerapps-helloworld:latest \
+              --image $IMAGE_NAME \
               --set-env-vars ASPNETCORE_ENVIRONMENT=Staging
           else
             echo "Creating new Container App: $APP_NAME"
@@ -66,46 +104,13 @@ jobs:
               --name $APP_NAME \
               --resource-group $RG \
               --environment $ENV_NAME \
-              --image mcr.microsoft.com/azuredocs/containerapps-helloworld:latest \
+              --image $IMAGE_NAME \
               --target-port 8080 \
               --ingress external \
               --env-vars ASPNETCORE_ENVIRONMENT=Staging \
               --min-replicas 0 \
               --max-replicas 1
           fi
-
-      - name: Build and push Docker image
-        run: |
-          APP_NAME="${{ steps.app-name.outputs.app_name }}"
-          RG="${{ env.RESOURCE_GROUP }}"
-          
-          # Get ACR login server
-          ACR_NAME=$(az acr list --resource-group $RG --query "[0].name" -o tsv)
-          if [ -z "$ACR_NAME" ]; then
-            echo "Creating Azure Container Registry..."
-            ACR_NAME="speakstorelocateacr$(date +%s | tail -c 6)"
-            az acr create \
-              --resource-group $RG \
-              --name $ACR_NAME \
-              --sku Basic \
-              --location ${{ env.LOCATION }}
-          fi
-          
-          ACR_LOGIN_SERVER=$(az acr show --name $ACR_NAME --resource-group $RG --query loginServer -o tsv)
-          
-          # Login to ACR
-          az acr login --name $ACR_NAME
-          
-          # Build and push
-          IMAGE_NAME="$ACR_LOGIN_SERVER/$APP_NAME:${{ github.sha }}"
-          docker build -f SpeakStoreLocate.ApiService/dockerfile -t $IMAGE_NAME .
-          docker push $IMAGE_NAME
-          
-          # Update container app with new image
-          az containerapp update \
-            --name $APP_NAME \
-            --resource-group $RG \
-            --image $IMAGE_NAME
 
       - name: Get deployment URL
         id: deployment-url

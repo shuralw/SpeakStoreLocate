@@ -44,8 +44,9 @@ Beispiele:
 
 2. **Azure CLI** (für lokale Tests):
    ```bash
-   # Windows
-   Invoke-WebRequest -Uri https://aka.ms/installazurecliwindows -OutFile .\AzureCLI.msi; Start-Process msiexec.exe -Wait -ArgumentList '/I AzureCLI.msi /quiet'
+   # Windows (PowerShell als Administrator)
+   Invoke-WebRequest -Uri https://aka.ms/installazurecliwindows -OutFile .\AzureCLI.msi
+   Start-Process msiexec.exe -Wait -ArgumentList '/I AzureCLI.msi /quiet'
    
    # macOS
    brew update && brew install azure-cli
