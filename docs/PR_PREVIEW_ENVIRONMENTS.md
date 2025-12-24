@@ -1,6 +1,6 @@
-# PR Preview Environments - Dokumentation
+# PR Preview-Umgebungen - Dokumentation
 
-Diese Dokumentation beschreibt die automatisierten Preview-Umgebungen für Feature-Branches, die mit Fly.io umgesetzt wurden.
+Diese Dokumentation beschreibt die automatisierten Preview-Umgebungen für Feature-Branches, die mit Azure Container Apps umgesetzt wurden.
 
 ## Überblick
 
@@ -27,33 +27,54 @@ Für jeden Pull Request wird automatisch eine isolierte Preview-Umgebung erstell
 
 Jede Preview-Umgebung ist unter einer eindeutigen URL erreichbar:
 ```
-https://speakstorelocate-pr-{PR_NUMBER}.fly.dev
+https://speakstorelocate-pr-{PR_NUMBER}.{region}.azurecontainerapps.io
 ```
 
 Beispiele:
-- PR #42: `https://speakstorelocate-pr-42.fly.dev`
-- PR #123: `https://speakstorelocate-pr-123.fly.dev`
+- PR #42: `https://speakstorelocate-pr-42.westeurope.azurecontainerapps.io`
+- PR #123: `https://speakstorelocate-pr-123.westeurope.azurecontainerapps.io`
 
 ## Einrichtung
 
 ### Voraussetzungen
 
-1. **Fly.io Account**: 
-   - Erstellen Sie einen Account auf [fly.io](https://fly.io/app/sign-up)
-   - Erstellen Sie eine Organisation (oder verwenden Sie die persönliche Organisation)
+1. **Azure Account**: 
+   - Erstellen Sie einen Account auf [Azure Portal](https://portal.azure.com)
+   - Erstellen Sie ein Azure-Abonnement (falls noch nicht vorhanden)
 
-2. **Fly.io API Token**:
+2. **Azure CLI** (für lokale Tests):
    ```bash
-   # Token generieren
-   flyctl auth token
+   # Windows
+   Invoke-WebRequest -Uri https://aka.ms/installazurecliwindows -OutFile .\AzureCLI.msi; Start-Process msiexec.exe -Wait -ArgumentList '/I AzureCLI.msi /quiet'
+   
+   # macOS
+   brew update && brew install azure-cli
+   
+   # Linux
+   curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
    ```
 
-3. **GitHub Repository Secrets**:
-   Fügen Sie folgende Secrets in den Repository-Einstellungen hinzu:
-   - `FLY_API_TOKEN`: Das API Token von Fly.io
-   - `FLY_ORG`: Der Name Ihrer Fly.io Organisation (z.B. "personal" oder Ihre Org-Name)
+3. **Service Principal erstellen**:
+   ```bash
+   # Anmelden bei Azure
+   az login
+   
+   # Service Principal erstellen
+   az ad sp create-for-rbac \
+     --name "SpeakStoreLocate-PR-Preview" \
+     --role contributor \
+     --scopes /subscriptions/{subscription-id}/resourceGroups/{resource-group} \
+     --sdk-auth
+   
+   # Ausgabe kopieren (wird für GitHub Secrets benötigt)
+   ```
 
-### Secrets einrichten
+4. **Resource Group erstellen**:
+   ```bash
+   az group create --name speakstorelocate-rg --location westeurope
+   ```
+
+### GitHub Repository Secrets einrichten
 
 1. Navigieren Sie zu: `Settings` → `Secrets and variables` → `Actions`
 2. Klicken Sie auf `New repository secret`
@@ -61,45 +82,10 @@ Beispiele:
 
    | Name | Wert | Beschreibung |
    |------|------|--------------|
-   | `FLY_API_TOKEN` | Ihr Fly.io API Token | Token für Fly.io API-Zugriff |
-   | `FLY_ORG` | Ihr Fly.io Org-Name | Organisation für App-Erstellung |
-
-### Fly.io CLI Installation (Optional)
-
-Für lokale Tests können Sie die Fly.io CLI installieren:
-
-```bash
-# macOS/Linux
-curl -L https://fly.io/install.sh | sh
-
-# Windows (PowerShell)
-iwr https://fly.io/install.ps1 -useb | iex
-```
+   | `AZURE_CREDENTIALS` | JSON-Output des Service Principal | Authentifizierung für Azure |
+   | `AZURE_RESOURCE_GROUP` | Name der Resource Group | z.B. "speakstorelocate-rg" |
 
 ## Konfiguration
-
-### fly.toml
-
-Die Hauptkonfigurationsdatei für Fly.io befindet sich im Repository-Root:
-
-```toml
-app = "speakstorelocate"
-primary_region = "fra"  # Frankfurt
-
-[build]
-  dockerfile = "SpeakStoreLocate.ApiService/dockerfile"
-
-[env]
-  ASPNETCORE_ENVIRONMENT = "Staging"  # Preview environments use Staging
-  ASPNETCORE_URLS = "http://+:8080"
-
-[http_service]
-  internal_port = 8080
-  force_https = true
-  auto_stop_machines = true
-  auto_start_machines = true
-  min_machines_running = 0
-```
 
 ### GitHub Workflow
 
@@ -108,6 +94,20 @@ Die Workflow-Datei `.github/workflows/pr-preview.yml` steuert die automatischen 
 - **Trigger**: Pull Request Events (opened, synchronize, reopened, closed)
 - **Deploy Job**: Erstellt/aktualisiert die Preview-Umgebung
 - **Cleanup Job**: Löscht die Preview-Umgebung beim Schließen
+
+### Azure Container Apps
+
+Die Anwendung wird auf Azure Container Apps deployed:
+
+```yaml
+Environment: speakstorelocate-env
+Region: westeurope (West Europa)
+Umgebungsvariable: ASPNETCORE_ENVIRONMENT=Staging
+Min Replicas: 0 (Auto-Scale auf 0)
+Max Replicas: 1
+Ingress: External (HTTPS)
+Port: 8080
+```
 
 ## Verwendung
 
@@ -128,13 +128,13 @@ Die Workflow-Datei `.github/workflows/pr-preview.yml` steuert die automatischen 
 3. **Pull Request erstellen**:
    - Erstellen Sie einen PR auf GitHub
    - Der Preview-Deployment-Workflow startet automatisch
-   - Nach 3-5 Minuten erscheint ein Kommentar mit der Preview-URL
+   - Nach 5-8 Minuten erscheint ein Kommentar mit der Preview-URL
 
 ### Für Reviewer
 
 1. **Preview-URL finden**:
    - Öffnen Sie den Pull Request
-   - Suchen Sie nach dem Kommentar "🚀 Preview Environment Deployed"
+   - Suchen Sie nach dem Kommentar "🚀 Preview-Umgebung bereitgestellt"
    - Klicken Sie auf die bereitgestellte URL
 
 2. **Änderungen testen**:
@@ -148,24 +148,26 @@ Die Workflow-Datei `.github/workflows/pr-preview.yml` steuert die automatischen 
 
 ## Kosten und Ressourcen
 
-### Fly.io Kostenmodell
+### Azure Kostenmodell
 
-- **Free Tier**: 
-  - 3 shared-cpu-1x VMs mit 256MB RAM (kostenlos)
+- **Container Apps Free Tier**: 
+  - 180.000 vCPU-Sekunden/Monat kostenlos
+  - 360.000 GiB-Sekunden/Monat kostenlos
   - Ideal für Preview-Umgebungen
   
-- **Auto-Stop**: 
-  - VMs werden bei Inaktivität automatisch gestoppt
-  - Keine Kosten bei gestoppten VMs
-  - Automatischer Start bei Zugriff
+- **Scale to Zero**: 
+  - Apps werden bei Inaktivität automatisch auf 0 Replicas skaliert
+  - Keine Kosten bei gestoppten Apps
+  - Automatischer Start bei Zugriff (Cold Start ~2-5 Sekunden)
 
 ### Ressourcen pro Preview
 
 Jede Preview-Umgebung verwendet:
-- **CPU**: 1 shared CPU
-- **RAM**: 1GB
-- **Region**: Frankfurt (fra)
-- **Auto-Stop**: Aktiviert (spart Kosten)
+- **CPU**: 0.25 vCPU
+- **RAM**: 0.5 GB
+- **Region**: West Europa (westeurope)
+- **Scale to Zero**: Aktiviert (spart Kosten)
+- **Container Registry**: Shared ACR für alle Previews
 
 ## Troubleshooting
 
@@ -173,17 +175,20 @@ Jede Preview-Umgebung verwendet:
 
 **Lösung**:
 1. Überprüfen Sie die GitHub Actions Logs
-2. Stellen Sie sicher, dass `FLY_API_TOKEN` und `FLY_ORG` korrekt gesetzt sind
-3. Überprüfen Sie, ob das Dockerfile korrekt ist
+2. Stellen Sie sicher, dass `AZURE_CREDENTIALS` und `AZURE_RESOURCE_GROUP` korrekt gesetzt sind
+3. Überprüfen Sie die Azure Portal Logs
 
 ### Problem: App startet nicht
 
 **Lösung**:
-1. Überprüfen Sie die Fly.io Logs:
+1. Überprüfen Sie die Azure Container Apps Logs:
    ```bash
-   flyctl logs --app speakstorelocate-pr-{PR_NUMBER}
+   az containerapp logs show \
+     --name speakstorelocate-pr-{PR_NUMBER} \
+     --resource-group {resource-group} \
+     --follow
    ```
-2. Prüfen Sie die Umgebungsvariablen in `fly.toml`
+2. Prüfen Sie die Umgebungsvariablen
 3. Stellen Sie sicher, dass Port 8080 korrekt exponiert wird
 
 ### Problem: Alte Preview-Umgebungen nicht gelöscht
@@ -191,19 +196,22 @@ Jede Preview-Umgebung verwendet:
 **Lösung**:
 1. Manuelle Löschung über CLI:
    ```bash
-   flyctl apps destroy speakstorelocate-pr-{PR_NUMBER} --yes
+   az containerapp delete \
+     --name speakstorelocate-pr-{PR_NUMBER} \
+     --resource-group {resource-group} \
+     --yes
    ```
-2. Oder über das Fly.io Dashboard
+2. Oder über das Azure Portal
 
-### Problem: Zu viele Apps erreicht Free Tier Limit
+### Problem: Image Build schlägt fehl
 
 **Lösung**:
-1. Löschen Sie alte, nicht mehr benötigte Preview-Apps:
+1. Überprüfen Sie das Dockerfile auf Fehler
+2. Testen Sie den Build lokal:
    ```bash
-   flyctl apps list
-   flyctl apps destroy <app-name> --yes
+   docker build -f SpeakStoreLocate.ApiService/dockerfile .
    ```
-2. Erwägen Sie ein Upgrade des Fly.io Plans
+3. Stellen Sie sicher, dass Docker auf GitHub Actions verfügbar ist
 
 ## Sicherheit
 
@@ -211,71 +219,100 @@ Jede Preview-Umgebung verwendet:
 
 1. **Secrets Management**:
    - Verwenden Sie niemals Secrets direkt im Code
-   - Alle sensiblen Daten gehören in GitHub Secrets oder Fly.io Secrets
+   - Alle sensiblen Daten gehören in GitHub Secrets oder Azure Key Vault
 
-2. **Umgebungsvariablen**:
-   - Secrets können über Fly.io Secrets gesetzt werden:
-   ```bash
-   flyctl secrets set SECRET_KEY=value --app speakstorelocate-pr-{PR_NUMBER}
-   ```
+2. **Service Principal Berechtigungen**:
+   - Der Service Principal sollte nur minimale Berechtigungen haben (Contributor auf Resource Group)
+   - Verwenden Sie separate Service Principals für Prod und Preview
 
-3. **Zugriffskontrolle**:
+3. **Netzwerksicherheit**:
    - Preview-URLs sind öffentlich zugänglich
-   - Implementieren Sie ggf. Basic Auth für Preview-Umgebungen
+   - Implementieren Sie ggf. Authentication über Azure AD
    - Verwenden Sie keine produktiven Daten in Preview-Umgebungen
 
-## Monitoring
+4. **Container Security**:
+   - Images werden in Azure Container Registry gespeichert
+   - ACR scannt Images automatisch auf Vulnerabilities
+   - Verwenden Sie immer aktuelle Base Images
+
+## Monitoring und Logging
 
 ### Logs anzeigen
 
 ```bash
 # Live-Logs verfolgen
-flyctl logs --app speakstorelocate-pr-{PR_NUMBER}
+az containerapp logs show \
+  --name speakstorelocate-pr-{PR_NUMBER} \
+  --resource-group {resource-group} \
+  --follow
 
-# Logs der letzten 100 Zeilen
-flyctl logs --app speakstorelocate-pr-{PR_NUMBER} --lines 100
+# Logs der letzten Stunde
+az containerapp logs show \
+  --name speakstorelocate-pr-{PR_NUMBER} \
+  --resource-group {resource-group} \
+  --tail 100
 ```
 
 ### Status überprüfen
 
 ```bash
 # App-Status
-flyctl status --app speakstorelocate-pr-{PR_NUMBER}
+az containerapp show \
+  --name speakstorelocate-pr-{PR_NUMBER} \
+  --resource-group {resource-group}
 
-# VM-Status
-flyctl vm status --app speakstorelocate-pr-{PR_NUMBER}
+# Revision Status
+az containerapp revision list \
+  --name speakstorelocate-pr-{PR_NUMBER} \
+  --resource-group {resource-group}
 ```
 
-## Alternativen
+### Azure Portal
 
-Obwohl Fly.io die bevorzugte Lösung ist, könnten folgende Alternativen ebenfalls verwendet werden:
+1. Öffnen Sie [Azure Portal](https://portal.azure.com)
+2. Navigieren Sie zur Resource Group
+3. Wählen Sie die Container App
+4. Unter "Monitoring" finden Sie:
+   - Logs
+   - Metriken
+   - Application Insights (wenn konfiguriert)
 
-1. **Vercel**: 
-   - Gut für Frontend-Apps
-   - Eingeschränkte .NET-Unterstützung
+## Vergleich zu anderen Plattformen
 
-2. **Netlify**:
-   - Ähnlich wie Vercel
-   - Primär für Static Sites
+### Warum Azure statt Fly.io/Vercel/Netlify?
 
-3. **Railway**:
-   - Gute .NET-Unterstützung
-   - Ähnliches Preismodell wie Fly.io
+| Feature | Azure Container Apps | Fly.io | Vercel/Netlify |
+|---------|---------------------|--------|----------------|
+| .NET Support | ✅ Vollständig | ✅ Docker | ⚠️ Limitiert |
+| Auto-Scale to Zero | ✅ | ✅ | ❌ |
+| Enterprise-Ready | ✅ | ⚠️ | ⚠️ |
+| Integration mit Azure | ✅ Native | ❌ | ❌ |
+| Kosten Free Tier | ✅ Großzügig | ✅ Gut | ✅ Gut |
+| Deutschland Region | ✅ West Europa | ✅ Frankfurt | ⚠️ Begrenzt |
 
-4. **Render**:
-   - Unterstützt Docker
-   - Automatische PR Previews verfügbar
+### Alternative: Azure Static Web Apps
 
-**Hinweis**: AWS wurde explizit ausgeschlossen und wird nicht als Alternative empfohlen.
+Für reine Frontend-Anwendungen könnte Azure Static Web Apps eine Alternative sein:
+- Einfachere Konfiguration
+- Automatische PR Previews integriert
+- Nicht geeignet für Backend-APIs
+
+**Hinweis**: AWS wurde explizit vom Anforderungsprofil ausgeschlossen.
 
 ## Support und Weiterführende Links
 
-- [Fly.io Dokumentation](https://fly.io/docs/)
-- [Fly.io CLI Referenz](https://fly.io/docs/flyctl/)
-- [Fly.io Preise](https://fly.io/docs/about/pricing/)
-- [GitHub Actions mit Fly.io](https://fly.io/docs/app-guides/continuous-deployment-with-github-actions/)
+- [Azure Container Apps Dokumentation](https://learn.microsoft.com/en-us/azure/container-apps/)
+- [Azure CLI Referenz](https://learn.microsoft.com/en-us/cli/azure/)
+- [Azure Preise Calculator](https://azure.microsoft.com/en-us/pricing/calculator/)
+- [GitHub Actions mit Azure](https://docs.github.com/en/actions/deployment/deploying-to-azure)
 
 ## Changelog
+
+- **2024-12-24**: Migration von Fly.io zu Azure Container Apps
+  - Automatisches Deployment via Azure CLI
+  - Container Registry Integration
+  - Scale to Zero für Kostenoptimierung
+  - Deutsche Dokumentation
 
 - **2024-12-13**: Initiale Implementierung mit Fly.io
   - Automatisches Deployment bei PR open/sync
