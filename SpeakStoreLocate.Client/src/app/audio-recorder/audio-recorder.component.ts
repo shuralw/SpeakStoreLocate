@@ -20,6 +20,9 @@ export interface PendingUpload {
   duration: number;
   isUploading: boolean;
   audioUrl?: string;
+  archived?: boolean;
+  uploadedAt?: number;
+  backendResults?: string[];
 }
 
 @Component({
@@ -51,6 +54,11 @@ export class AudioRecorderComponent implements OnInit {
 
   pendingUploads: PendingUpload[] = [];
   currentlyPlaying?: string;
+
+  /** Pending uploads only (archived uploads are kept for future features). */
+  get pendingUploadsActive(): PendingUpload[] {
+    return this.pendingUploads.filter(u => !u.archived);
+  }
 
   // Editing state
   editingId?: string;
@@ -106,9 +114,15 @@ export class AudioRecorderComponent implements OnInit {
       for (const { item, duration } of withDurations) {
         // 2) Für jedes Audio einen PendingUpload bauen und anzeigen
         const upload: PendingUpload = this.buildPendingUpload(item.blob, duration, `cache-${item.id}`);
+        upload.archived = item.status === 'archived';
+        upload.uploadedAt = item.uploadedAt;
+        upload.backendResults = item.backendResults;
         this.zone.run(() => this.pendingUploads.push(upload));
-        // 3) Upload starten, aber nicht auf Abschluss warten
-        void this.uploadAudio(upload, true).catch((err) => { console.error('Upload error:', err); /* Upload-Fehler wird intern behandelt */ });
+
+        // 3) Upload starten, aber nicht auf Abschluss warten (nur wenn nicht archiviert)
+        if (!upload.archived) {
+          void this.uploadAudio(upload, true).catch((err) => { console.error('Upload error:', err); /* Upload-Fehler wird intern behandelt */ });
+        }
       }
     } catch (err) {
       console.error('Failed to load cached uploads:', err);
@@ -232,15 +246,14 @@ export class AudioRecorderComponent implements OnInit {
         this.http.post<string[]>(`${this.API_BASE}/upload-audio`, form)
       );
 
-      // Upload erfolgreich - aus Liste entfernen
+      // Upload erfolgreich - als archiviert markieren (nicht mehr pending)
       this.zone.run(() => {
         const index = this.pendingUploads.findIndex(p => p.id === upload.id);
         if (index >= 0) {
-          // URL freigeben
-          if (this.pendingUploads[index].audioUrl) {
-            URL.revokeObjectURL(this.pendingUploads[index].audioUrl!);
-          }
-          this.pendingUploads.splice(index, 1);
+          this.pendingUploads[index].isUploading = false;
+          this.pendingUploads[index].archived = true;
+          this.pendingUploads[index].uploadedAt = Date.now();
+          this.pendingUploads[index].backendResults = results;
         }
       });
 
@@ -250,11 +263,15 @@ export class AudioRecorderComponent implements OnInit {
         await new Promise(resolve => setTimeout(resolve, 5500));
       }
 
-      // Falls es sich um einen gecachten Eintrag handelt, aus IndexedDB entfernen
+      // Falls es sich um einen gecachten Eintrag handelt: als archiviert markieren (nicht löschen)
       if (upload.id.startsWith('cache-')) {
         const numericId = parseInt(upload.id.replace('cache-', ''), 10);
         if (!Number.isNaN(numericId)) {
-          try { await AudioCache.remove(numericId); } catch { }
+          try {
+            await AudioCache.markArchived(numericId, { uploadedAt: Date.now(), backendResults: results });
+          } catch (err) {
+            console.error('[AudioRecorderComponent] Failed to mark cached upload as archived:', err);
+          }
         }
       }
 

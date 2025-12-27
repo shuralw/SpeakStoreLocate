@@ -10,13 +10,23 @@ export class AudioCache {
   private static dbName = 'audio-cache-db';
   private static storeName = 'audio-blobs';
 
-  static async save(blob: Blob) {
+  /**
+   * Save a blob for later upload.
+   * Persisted shape is backward-compatible with older entries.
+   */
+  static async save(blob: Blob, meta?: { status?: 'pending' | 'archived'; uploadedAt?: number; backendResults?: string[] }) {
     console.log('[AudioCache.save] Attempting to save blob:', blob);
     const db = await this.open();
     const tx = db.transaction(this.storeName, 'readwrite');
     const store = tx.objectStore(this.storeName);
     await new Promise<void>((resolve, reject) => {
-      const req = store.add({ blob, timestamp: Date.now() });
+      const req = store.add({
+        blob,
+        timestamp: Date.now(),
+        status: meta?.status ?? 'pending',
+        uploadedAt: meta?.uploadedAt,
+        backendResults: meta?.backendResults,
+      });
       req.onsuccess = () => {
         console.info('[AudioCache.save] Blob saved successfully.');
         resolve();
@@ -67,17 +77,17 @@ export class AudioCache {
 
   // Fetch all cached entries without modifying them
   // Prefer listAll() for clarity. getAll() is kept as alias.
-  static async getAll(): Promise<Array<{ id: number; blob: Blob; timestamp: number }>> {
+  static async getAll(): Promise<Array<{ id: number; blob: Blob; timestamp: number; status?: 'pending' | 'archived'; uploadedAt?: number; backendResults?: string[] }>> {
     return this.listAll();
   }
 
   // Junior-friendly name: listAll returns an array of { id, blob, timestamp }
-  static async listAll(): Promise<Array<{ id: number; blob: Blob; timestamp: number }>> {
+  static async listAll(): Promise<Array<{ id: number; blob: Blob; timestamp: number; status?: 'pending' | 'archived'; uploadedAt?: number; backendResults?: string[] }>> {
     const db = await this.open();
     try {
       const tx = db.transaction(this.storeName, 'readonly');
       const store = tx.objectStore(this.storeName);
-      const all: Array<{ id: number; blob: Blob; timestamp: number }> = await new Promise((resolve, reject) => {
+      const all: Array<{ id: number; blob: Blob; timestamp: number; status?: 'pending' | 'archived'; uploadedAt?: number; backendResults?: string[] }> = await new Promise((resolve, reject) => {
         const req = (store as any).getAll ? (store as any).getAll() : store.openCursor();
         if ((store as any).getAll) {
           req.onsuccess = () => resolve(req.result as any);
@@ -97,6 +107,42 @@ export class AudioCache {
         }
       });
       return all;
+    } finally {
+      db.close();
+    }
+  }
+
+  /** Mark a cached entry as archived (keeps the blob for future reprocessing). */
+  static async markArchived(id: number, meta?: { uploadedAt?: number; backendResults?: string[] }): Promise<void> {
+    const db = await this.open();
+    try {
+      const tx = db.transaction(this.storeName, 'readwrite');
+      const store = tx.objectStore(this.storeName);
+
+      const existing = await new Promise<any>((resolve, reject) => {
+        const req = store.get(id);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+
+      if (!existing) {
+        console.warn('[AudioCache.markArchived] Entry not found:', id);
+        return;
+      }
+
+      const updated = {
+        ...existing,
+        status: 'archived',
+        uploadedAt: meta?.uploadedAt ?? Date.now(),
+        backendResults: meta?.backendResults ?? existing.backendResults,
+      };
+
+      await new Promise<void>((resolve, reject) => {
+        const req = store.put(updated);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+      console.info('[AudioCache.markArchived] Archived entry:', id);
     } finally {
       db.close();
     }
