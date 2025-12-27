@@ -60,6 +60,11 @@ export class AudioRecorderComponent implements OnInit {
     return this.pendingUploads.filter(u => !u.archived);
   }
 
+  /** Archived uploads count (kept locally after successful upload). */
+  get archivedUploadsCount(): number {
+    return this.pendingUploads.filter(u => !!u.archived).length;
+  }
+
   // Editing state
   editingId?: string;
   editName: string = '';
