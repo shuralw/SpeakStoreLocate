@@ -80,7 +80,7 @@ public class InterpretationPromptParts : IInterpretationPromptParts
             sb.Append("\n");
         }
 
-        sb.Append("]\n}. Nutze diese Information, um die Quelle und das Ziel von Lagerbewegungen besser zu bestimmen und dadurch duplikate Lokationen aufgrund von geringfügigen Abweichungen zu vermeiden..");
+        sb.Append("]\n}. Nutze diese Information, um die Quelle und das Ziel von Lagerbewegungen besser zu bestimmen und dadurch duplikate Lokationen aufgrund von geringfügigen Abweichungen zu vermeiden.");
         return sb.ToString();
     }
 }

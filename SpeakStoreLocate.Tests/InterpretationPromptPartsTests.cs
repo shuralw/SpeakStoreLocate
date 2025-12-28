@@ -20,7 +20,8 @@ public class InterpretationPromptPartsTests
         Assert.DoesNotContain("\"Name\":", text);
         // Kein trailing comma vor ]
         Assert.DoesNotContain(",\n]\n}", text.Replace("\r\n", "\n"));
-        Assert.EndsWith("besser zu bestimmen.", text.Trim());
+        Assert.Contains("besser zu bestimmen", text, StringComparison.Ordinal);
+        Assert.EndsWith("zu vermeiden.", text.Trim());
     }
 
     [Fact]

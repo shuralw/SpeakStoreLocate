@@ -1,4 +1,5 @@
 using SpeakStoreLocate.ApiService.Services.Interpretation;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace SpeakStoreLocate.Tests;
 
@@ -9,7 +10,7 @@ public class InterpretationPromptBuilderTests
     {
         // Arrange
         IInterpretationPromptParts parts = new InterpretationPromptParts();
-        IInterpretationPromptBuilder builder = new InterpretationPromptBuilder(parts, null);
+        IInterpretationPromptBuilder builder = new InterpretationPromptBuilder(parts, NullLogger<InterpretationPromptBuilder>.Instance);
         var transcript = "Packe die Lampe nach Regal B.";
         var locations = new[] { "Regal A", "Regal B" };
 

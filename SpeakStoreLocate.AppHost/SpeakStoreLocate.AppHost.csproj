@@ -17,4 +17,14 @@
     <PackageReference Include="Aspire.Hosting.AppHost" Version="9.0.0" />
   </ItemGroup>
 
+  <Target Name="_CollectWatchItems">
+    <ItemGroup>
+      <Watch Include="$(MSBuildProjectFullPath)" />
+      <Watch Include="@(Compile)" Condition="'@(Compile)' != ''" />
+      <Watch Include="@(Content)" Condition="'@(Content)' != ''" />
+      <Watch Include="@(None)" Condition="'@(None)' != ''" />
+      <Watch Include="@(EmbeddedResource)" Condition="'@(EmbeddedResource)' != ''" />
+    </ItemGroup>
+  </Target>
+
 </Project>
