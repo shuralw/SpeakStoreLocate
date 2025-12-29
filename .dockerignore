@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.angular/
+.git/
+.github/
+docs/
+scripts/
+*.log
+.DS_Store
+.env
+.env.local
+*.swp
+*.swo
+*~

@@ -7,11 +7,11 @@ on:
 env:
   RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
   LOCATION: germanywestcentral
-  ACR_NAME: speakstorelocateacr
+  ACR_NAME: speakstorelocate
 
 jobs:
   deploy:
-    name: Deploy PR Preview
+    name: Deploy PR Preview (API + Client)
     runs-on: ubuntu-latest
     if: github.event.action != 'closed'
     permissions:
@@ -23,18 +23,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Azure Login (OIDC)
-        uses: azure/login@v1
+      - name: Azure Login
+        uses: azure/login@v2
         with:
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Generate app name
-        id: app-name
+      - name: Generate names
+        id: names
         run: |
-          APP_NAME="speakstorelocate-pr-${{ github.event.pull_request.number }}"
-          echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          SHA_SHORT=$(echo ${{ github.sha }} | cut -c1-7)
+          API_APP="speakstorelocate-api-pr-${PR_NUMBER}"
+          CLIENT_APP="speakstorelocate-client-pr-${PR_NUMBER}"
+          ENV_NAME="speakstorelocate-env"
+          TAG="pr-${PR_NUMBER}-sha-${SHA_SHORT}"
+          
+          echo "api_app=$API_APP" >> $GITHUB_OUTPUT
+          echo "client_app=$CLIENT_APP" >> $GITHUB_OUTPUT
+          echo "env_name=$ENV_NAME" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Resolve ACR login server
         id: acr
@@ -45,25 +52,37 @@ jobs:
             --query loginServer -o tsv)
           echo "login_server=$ACR_LOGIN_SERVER" >> $GITHUB_OUTPUT
 
-      - name: Build and push Docker image
-        id: build-image
+      - name: ACR Login
+        run: az acr login --name $ACR_NAME
+
+      - name: Build and push API image
+        id: build-api
         run: |
-          APP_NAME="${{ steps.app-name.outputs.app_name }}"
           LOGIN_SERVER="${{ steps.acr.outputs.login_server }}"
-          IMAGE_NAME="$LOGIN_SERVER/$APP_NAME:${{ github.sha }}"
+          TAG="${{ steps.names.outputs.tag }}"
+          API_IMAGE="$LOGIN_SERVER/speakstorelocate-apiservice:$TAG"
 
-          az acr login --name $ACR_NAME
-          docker build -f SpeakStoreLocate.ApiService/dockerfile -t $IMAGE_NAME .
-          docker push $IMAGE_NAME
+          docker build -f SpeakStoreLocate.ApiService/dockerfile -t $API_IMAGE .
+          docker push $API_IMAGE
 
-          echo "image_name=$IMAGE_NAME" >> $GITHUB_OUTPUT
+          echo "image=$API_IMAGE" >> $GITHUB_OUTPUT
 
-      - name: Create or update Container App
+      - name: Build and push Client image
+        id: build-client
         run: |
-          APP_NAME="${{ steps.app-name.outputs.app_name }}"
-          IMAGE_NAME="${{ steps.build-image.outputs.image_name }}"
-          ENV_NAME="speakstorelocate-env"
+          LOGIN_SERVER="${{ steps.acr.outputs.login_server }}"
+          TAG="${{ steps.names.outputs.tag }}"
+          CLIENT_IMAGE="$LOGIN_SERVER/speakstorelocate-client:$TAG"
 
+          docker build -f SpeakStoreLocate.Client/dockerfile -t $CLIENT_IMAGE .
+          docker push $CLIENT_IMAGE
+
+          echo "image=$CLIENT_IMAGE" >> $GITHUB_OUTPUT
+
+      - name: Create or update Container App Environment
+        run: |
+          ENV_NAME="${{ steps.names.outputs.env_name }}"
+          
           if ! az containerapp env show -n $ENV_NAME -g $RESOURCE_GROUP 2>/dev/null; then
             az containerapp env create \
               -n $ENV_NAME \
@@ -71,48 +90,98 @@ jobs:
               -l $LOCATION
           fi
 
-          if az containerapp show -n $APP_NAME -g $RESOURCE_GROUP 2>/dev/null; then
+      - name: Create or update API Container App
+        run: |
+          API_APP="${{ steps.names.outputs.api_app }}"
+          API_IMAGE="${{ steps.build-api.outputs.image }}"
+          ENV_NAME="${{ steps.names.outputs.env_name }}"
+
+          if az containerapp show -n $API_APP -g $RESOURCE_GROUP 2>/dev/null; then
             az containerapp update \
-              -n $APP_NAME \
+              -n $API_APP \
               -g $RESOURCE_GROUP \
-              --image $IMAGE_NAME \
-              --set-env-vars ASPNETCORE_ENVIRONMENT=Staging
+              --image $API_IMAGE \
+              --set-env-vars ASPNETCORE_ENVIRONMENT=Development
           else
             az containerapp create \
-              -n $APP_NAME \
+              -n $API_APP \
               -g $RESOURCE_GROUP \
               --environment $ENV_NAME \
-              --image $IMAGE_NAME \
+              --image $API_IMAGE \
               --target-port 8080 \
               --ingress external \
-              --env-vars ASPNETCORE_ENVIRONMENT=Staging \
+              --env-vars ASPNETCORE_ENVIRONMENT=Development \
               --min-replicas 0 \
               --max-replicas 1
           fi
 
-      - name: Get deployment URL
-        id: deployment-url
+      - name: Get API FQDN
+        id: api-url
         run: |
-          FQDN=$(az containerapp show \
-            -n "${{ steps.app-name.outputs.app_name }}" \
+          API_APP="${{ steps.names.outputs.api_app }}"
+          API_FQDN=$(az containerapp show \
+            -n "$API_APP" \
             -g $RESOURCE_GROUP \
             --query properties.configuration.ingress.fqdn -o tsv)
-          echo "url=https://$FQDN" >> $GITHUB_OUTPUT
+          API_URL="https://$API_FQDN"
+          echo "url=$API_URL" >> $GITHUB_OUTPUT
+
+      - name: Create or update Client Container App
+        run: |
+          CLIENT_APP="${{ steps.names.outputs.client_app }}"
+          CLIENT_IMAGE="${{ steps.build-client.outputs.image }}"
+          ENV_NAME="${{ steps.names.outputs.env_name }}"
+          API_URL="${{ steps.api-url.outputs.url }}"
+
+          if az containerapp show -n $CLIENT_APP -g $RESOURCE_GROUP 2>/dev/null; then
+            az containerapp update \
+              -n $CLIENT_APP \
+              -g $RESOURCE_GROUP \
+              --image $CLIENT_IMAGE \
+              --set-env-vars API_BASE="$API_URL/api/storage"
+          else
+            az containerapp create \
+              -n $CLIENT_APP \
+              -g $RESOURCE_GROUP \
+              --environment $ENV_NAME \
+              --image $CLIENT_IMAGE \
+              --target-port 80 \
+              --ingress external \
+              --env-vars API_BASE="$API_URL/api/storage" \
+              --min-replicas 0 \
+              --max-replicas 1
+          fi
+
+      - name: Get Client FQDN
+        id: client-url
+        run: |
+          CLIENT_APP="${{ steps.names.outputs.client_app }}"
+          CLIENT_FQDN=$(az containerapp show \
+            -n "$CLIENT_APP" \
+            -g $RESOURCE_GROUP \
+            --query properties.configuration.ingress.fqdn -o tsv)
+          CLIENT_URL="https://$CLIENT_FQDN"
+          echo "url=$CLIENT_URL" >> $GITHUB_OUTPUT
 
       - name: Comment on PR
         uses: actions/github-script@v7
         with:
           script: |
             const pr = context.payload.pull_request.number;
-            const url = '${{ steps.deployment-url.outputs.url }}';
-            const app = '${{ steps.app-name.outputs.app_name }}';
+            const clientUrl = '${{ steps.client-url.outputs.url }}';
+            const apiUrl = '${{ steps.api-url.outputs.url }}';
 
             const body = `## 🚀 Preview-Umgebung bereitgestellt
 
-- **URL**: ${url}
-- **App**: \`${app}\`
+### Client
+- URL: ${clientUrl}
+- API: ${apiUrl}
 
-Wird automatisch gelöscht, wenn der PR geschlossen wird.`;
+### API
+- Base URL: ${apiUrl}
+- Swagger: ${apiUrl}/swagger
+
+Die Umgebung wird automatisch gelöscht, wenn der PR geschlossen wird.`;
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
@@ -127,20 +196,21 @@ Wird automatisch gelöscht, wenn der PR geschlossen wird.`;
     if: github.event.action == 'closed'
     permissions:
       pull-requests: write
-      id-token: write
 
     steps:
-      - name: Azure Login (OIDC)
-        uses: azure/login@v1
+      - name: Azure Login
+        uses: azure/login@v2
         with:
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Delete Container App
+      - name: Delete API and Client Container Apps
         run: |
-          APP_NAME="speakstorelocate-pr-${{ github.event.pull_request.number }}"
-          az containerapp delete -n $APP_NAME -g $RESOURCE_GROUP --yes || true
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          API_APP="speakstorelocate-api-pr-${PR_NUMBER}"
+          CLIENT_APP="speakstorelocate-client-pr-${PR_NUMBER}"
+          
+          az containerapp delete -n $API_APP -g $RESOURCE_GROUP --yes || true
+          az containerapp delete -n $CLIENT_APP -g $RESOURCE_GROUP --yes || true
 
       - name: Comment on PR
         uses: actions/github-script@v7
@@ -151,5 +221,5 @@ Wird automatisch gelöscht, wenn der PR geschlossen wird.`;
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: pr,
-              body: '## 🧹 Preview-Umgebung bereinigt\nDie Preview-App wurde gelöscht.'
+              body: '## 🧹 Preview-Umgebung bereinigt\nAPI und Client wurden gelöscht.'
             });
