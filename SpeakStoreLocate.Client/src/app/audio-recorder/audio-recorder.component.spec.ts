@@ -23,4 +23,22 @@ describe('AudioRecorderComponent', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  describe('Audio Level Indicator', () => {
+    it('should initialize audioLevel to 0', () => {
+      expect(component.audioLevel).toBe(0);
+    });
+
+    it('should reset audioLevel to 0 when stopAudioLevelMonitoring is called', () => {
+      // Set a non-zero value first
+      component.audioLevel = 50;
+      // Call the private method using bracket notation
+      (component as any).stopAudioLevelMonitoring();
+      expect(component.audioLevel).toBe(0);
+    });
+
+    it('should not have isRecording true initially', () => {
+      expect(component.isRecording).toBeFalse();
+    });
+  });
 });
