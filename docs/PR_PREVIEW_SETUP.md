@@ -96,7 +96,7 @@ Beispiel-Ausgabe:
 4. Fügen Sie folgende Secrets hinzu:
 
 | Secret Name | Wert | Beschreibung |
-|------------|------|--------------|
+| ------------ | ------ | ------------ |
 | `AZURE_CREDENTIALS` | Die komplette JSON-Ausgabe aus Schritt 2 | Für Azure-Authentifizierung |
 | `AZURE_RESOURCE_GROUP` | `speakstorelocate` | Name der Resource Group |
 
@@ -197,12 +197,13 @@ Testen Sie die Einrichtung:
 ## Preview-URL Format
 
 ```
-https://speakstorelocate-pr-{PR_NUMMER}.westeurope.azurecontainerapps.io
+https://speakstorelocate-api-pr-{PR_NUMMER}.germanywestcentral.azurecontainerapps.io
+https://speakstorelocate-client-pr-{PR_NUMMER}.germanywestcentral.azurecontainerapps.io
 ```
 
 Beispiele:
-- PR #1: `https://speakstorelocate-pr-1.westeurope.azurecontainerapps.io`
-- PR #42: `https://speakstorelocate-pr-42.westeurope.azurecontainerapps.io`
+- PR #1: `https://speakstorelocate-api-pr-1.germanywestcentral.azurecontainerapps.io`
+- PR #42: `https://speakstorelocate-client-pr-42.germanywestcentral.azurecontainerapps.io`
 
 ## Troubleshooting
 
