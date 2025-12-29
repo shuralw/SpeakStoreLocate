@@ -29,7 +29,6 @@ jobs:
               - 'SpeakStoreLocate.Tests/**'
               - 'SpeakStoreLocate.sln'
               - 'global.json'
-              - '.github/workflows/pr-build-validation.yml'
 
       - name: Setup .NET
         if: steps.backend-filter.outputs.backend == 'true'
@@ -64,7 +63,7 @@ jobs:
           fi
 
       - name: Build Docker Image
-        if: |
+        if: >-
           steps.backend-filter.outputs.backend == 'true' &&
           steps.dockerfile-check.outputs.exists == 'true'
         run: |
