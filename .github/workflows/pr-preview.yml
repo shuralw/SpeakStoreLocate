@@ -8,6 +8,7 @@ env:
   RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
   LOCATION: germanywestcentral
   ACR_NAME: speakstorelocate
+  ACR_PULL_IDENTITY_RESOURCE_ID: ${{ vars.AZURE_ACR_PULL_IDENTITY_RESOURCE_ID }}
 
 jobs:
   deploy:
@@ -91,26 +92,102 @@ jobs:
           fi
 
       - name: Create or update API Container App
+        env:
+          AWS_S3_BUCKETNAME: ${{ secrets.AWS_S3_BUCKETNAME }}
+          AWS_S3_ACCESSKEY: ${{ secrets.AWS_S3_ACCESSKEY }}
+          AWS_S3_SECRETKEY: ${{ secrets.AWS_S3_SECRETKEY }}
+          AWS_DYNAMODB_TABLENAME: ${{ secrets.AWS_DYNAMODB_TABLENAME }}
+          AWS_DYNAMODB_ACCESSKEY: ${{ secrets.AWS_DYNAMODB_ACCESSKEY }}
+          AWS_DYNAMODB_SECRETKEY: ${{ secrets.AWS_DYNAMODB_SECRETKEY }}
+          AWS_TRANSCRIBE_ACCESSKEY: ${{ secrets.AWS_TRANSCRIBE_ACCESSKEY }}
+          AWS_TRANSCRIBE_SECRETKEY: ${{ secrets.AWS_TRANSCRIBE_SECRETKEY }}
+          DEEPGRAM_APIKEY: ${{ secrets.DEEPGRAM_APIKEY }}
+          ELEVENLABS_APIKEY: ${{ secrets.ELEVENLABS_APIKEY }}
+          OPENAI_APIKEY: ${{ secrets.OPENAI_APIKEY }}
+          OPENAI_DEFAULTMODEL: ${{ secrets.OPENAI_DEFAULTMODEL }}
         run: |
           API_APP="${{ steps.names.outputs.api_app }}"
           API_IMAGE="${{ steps.build-api.outputs.image }}"
           ENV_NAME="${{ steps.names.outputs.env_name }}"
+          LOGIN_SERVER="${{ steps.acr.outputs.login_server }}"
+
+          # Store secrets in the Container App and reference them via secretref:...
+          # (So values never show up as plain env-vars in ARM state)
+          API_SECRETS=(
+            aws-s3-bucketname="$AWS_S3_BUCKETNAME"
+            aws-s3-accesskey="$AWS_S3_ACCESSKEY"
+            aws-s3-secretkey="$AWS_S3_SECRETKEY"
+            aws-dynamodb-tablename="$AWS_DYNAMODB_TABLENAME"
+            aws-dynamodb-accesskey="$AWS_DYNAMODB_ACCESSKEY"
+            aws-dynamodb-secretkey="$AWS_DYNAMODB_SECRETKEY"
+            aws-transcribe-accesskey="$AWS_TRANSCRIBE_ACCESSKEY"
+            aws-transcribe-secretkey="$AWS_TRANSCRIBE_SECRETKEY"
+            deepgram-apikey="$DEEPGRAM_APIKEY"
+            elevenlabs-apikey="$ELEVENLABS_APIKEY"
+            openai-apikey="$OPENAI_APIKEY"
+            openai-defaultmodel="$OPENAI_DEFAULTMODEL"
+          )
+
+          API_ENV_VARS=(
+            ASPNETCORE_ENVIRONMENT=Development
+            AWS__S3__BucketName=secretref:aws-s3-bucketname
+            AWS__S3__AccessKey=secretref:aws-s3-accesskey
+            AWS__S3__SecretKey=secretref:aws-s3-secretkey
+            AWS__DynamoDB__TableName=secretref:aws-dynamodb-tablename
+            AWS__DynamoDB__AccessKey=secretref:aws-dynamodb-accesskey
+            AWS__DynamoDB__SecretKey=secretref:aws-dynamodb-secretkey
+            AWS__Transcribe__AccessKey=secretref:aws-transcribe-accesskey
+            AWS__Transcribe__SecretKey=secretref:aws-transcribe-secretkey
+            Deepgram__ApiKey=secretref:deepgram-apikey
+            ElevenLabs__ApiKey=secretref:elevenlabs-apikey
+            OpenAI__ApiKey=secretref:openai-apikey
+            OpenAI__DefaultModel=secretref:openai-defaultmodel
+          )
+
+          if [ -z "$ACR_PULL_IDENTITY_RESOURCE_ID" ]; then
+            echo "AZURE_ACR_PULL_IDENTITY_RESOURCE_ID repo variable is not set. Configure it in GitHub: Settings → Secrets and variables → Actions → Variables."
+            exit 1
+          fi
 
           if az containerapp show -n $API_APP -g $RESOURCE_GROUP 2>/dev/null; then
+            az containerapp secret set \
+              -n $API_APP \
+              -g $RESOURCE_GROUP \
+              --secrets "${API_SECRETS[@]}"
+
+            az containerapp identity assign \
+              -n $API_APP \
+              -g $RESOURCE_GROUP \
+              --user-assigned "$ACR_PULL_IDENTITY_RESOURCE_ID" \
+              -o none
+
+            az containerapp registry set \
+              -n $API_APP \
+              -g $RESOURCE_GROUP \
+              --server "$LOGIN_SERVER" \
+              --identity "$ACR_PULL_IDENTITY_RESOURCE_ID" \
+              -o none
+
             az containerapp update \
               -n $API_APP \
               -g $RESOURCE_GROUP \
               --image $API_IMAGE \
-              --set-env-vars ASPNETCORE_ENVIRONMENT=Development
+              --set-env-vars "${API_ENV_VARS[@]}"
+
+            REV=$(az containerapp show -n $API_APP -g $RESOURCE_GROUP --query properties.latestRevisionName -o tsv)
+            az containerapp revision restart -n $API_APP -g $RESOURCE_GROUP --revision $REV -o none
           else
             az containerapp create \
               -n $API_APP \
               -g $RESOURCE_GROUP \
               --environment $ENV_NAME \
               --image $API_IMAGE \
+              --registry-server "$LOGIN_SERVER" \
+              --registry-identity "$ACR_PULL_IDENTITY_RESOURCE_ID" \
               --target-port 8080 \
               --ingress external \
-              --env-vars ASPNETCORE_ENVIRONMENT=Development \
+              --secrets "${API_SECRETS[@]}" \
+              --env-vars "${API_ENV_VARS[@]}" \
               --min-replicas 0 \
               --max-replicas 1
           fi
@@ -132,19 +209,43 @@ jobs:
           CLIENT_IMAGE="${{ steps.build-client.outputs.image }}"
           ENV_NAME="${{ steps.names.outputs.env_name }}"
           API_URL="${{ steps.api-url.outputs.url }}"
+          LOGIN_SERVER="${{ steps.acr.outputs.login_server }}"
+
+          if [ -z "$ACR_PULL_IDENTITY_RESOURCE_ID" ]; then
+            echo "AZURE_ACR_PULL_IDENTITY_RESOURCE_ID repo variable is not set. Configure it in GitHub: Settings → Secrets and variables → Actions → Variables."
+            exit 1
+          fi
 
           if az containerapp show -n $CLIENT_APP -g $RESOURCE_GROUP 2>/dev/null; then
+            az containerapp identity assign \
+              -n $CLIENT_APP \
+              -g $RESOURCE_GROUP \
+              --user-assigned "$ACR_PULL_IDENTITY_RESOURCE_ID" \
+              -o none
+
+            az containerapp registry set \
+              -n $CLIENT_APP \
+              -g $RESOURCE_GROUP \
+              --server "$LOGIN_SERVER" \
+              --identity "$ACR_PULL_IDENTITY_RESOURCE_ID" \
+              -o none
+
             az containerapp update \
               -n $CLIENT_APP \
               -g $RESOURCE_GROUP \
               --image $CLIENT_IMAGE \
               --set-env-vars API_BASE="$API_URL/api/storage"
+
+            REV=$(az containerapp show -n $CLIENT_APP -g $RESOURCE_GROUP --query properties.latestRevisionName -o tsv)
+            az containerapp revision restart -n $CLIENT_APP -g $RESOURCE_GROUP --revision $REV -o none
           else
             az containerapp create \
               -n $CLIENT_APP \
               -g $RESOURCE_GROUP \
               --environment $ENV_NAME \
               --image $CLIENT_IMAGE \
+              --registry-server "$LOGIN_SERVER" \
+              --registry-identity "$ACR_PULL_IDENTITY_RESOURCE_ID" \
               --target-port 80 \
               --ingress external \
               --env-vars API_BASE="$API_URL/api/storage" \

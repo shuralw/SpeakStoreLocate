@@ -14,14 +14,27 @@ Diese Checkliste hilft Repository-Maintainern bei der Einrichtung der automatisi
 - [ ] Bei Azure anmelden: `az login`
 - [ ] Richtiges Abonnement auswählen: `az account set --subscription {subscription-id}`
 
+### 2.5 Azure Resource Provider registrieren (einmalig)
+
+- [ ] Provider registrieren (benötigt Subscription-Rechte; z.B. Contributor/Owner):
+  ```bash
+  az provider register --namespace Microsoft.App --wait
+  az provider register --namespace Microsoft.OperationalInsights --wait
+  az provider register --namespace Microsoft.ContainerRegistry --wait
+  ```
+- [ ] Optional (je nach Setup):
+  ```bash
+  az provider register --namespace Microsoft.ManagedIdentity --wait
+  ```
+
 ### 3. Resource Group erstellen
 - [ ] Resource Group erstellen:
   ```bash
-  az group create --name speakstorelocate-rg --location westeurope
+  az group create --name speakstorelocate --location germanywestcentral
   ```
 - [ ] Erstellung bestätigen:
   ```bash
-  az group show --name speakstorelocate-rg
+  az group show --name speakstorelocate
   ```
 
 ### 4. Service Principal erstellen
@@ -30,7 +43,7 @@ Diese Checkliste hilft Repository-Maintainern bei der Einrichtung der automatisi
   az ad sp create-for-rbac \
     --name "SpeakStoreLocate-PR-Preview" \
     --role contributor \
-    --scopes /subscriptions/{subscription-id}/resourceGroups/speakstorelocate-rg \
+    --scopes /subscriptions/{subscription-id}/resourceGroups/speakstorelocate \
     --sdk-auth
   ```
 - [ ] Komplette JSON-Ausgabe kopieren (wird für GitHub Secrets benötigt)
@@ -40,7 +53,24 @@ Diese Checkliste hilft Repository-Maintainern bei der Einrichtung der automatisi
 - [ ] Zu Repository navigieren: Settings → Secrets and variables → Actions
 - [ ] "New repository secret" klicken
 - [ ] `AZURE_CREDENTIALS` hinzufügen mit kompletter JSON-Ausgabe
-- [ ] `AZURE_RESOURCE_GROUP` hinzufügen mit Wert `speakstorelocate-rg`
+- [ ] `AZURE_RESOURCE_GROUP` hinzufügen mit Wert `speakstorelocate`
+
+- [ ] GitHub Actions Variable hinzufügen (empfohlen, für ACR Pull ohne Passwort):
+  - [ ] `AZURE_ACR_PULL_IDENTITY_RESOURCE_ID` (Resource ID einer User Assigned Managed Identity mit `AcrPull` auf dem ACR)
+
+- [ ] Backend-Secrets hinzufügen (für API-Integrationen in Preview):
+  - [ ] `AWS_S3_BUCKETNAME`
+  - [ ] `AWS_S3_ACCESSKEY`
+  - [ ] `AWS_S3_SECRETKEY`
+  - [ ] `AWS_DYNAMODB_TABLENAME`
+  - [ ] `AWS_DYNAMODB_ACCESSKEY`
+  - [ ] `AWS_DYNAMODB_SECRETKEY`
+  - [ ] `AWS_TRANSCRIBE_ACCESSKEY`
+  - [ ] `AWS_TRANSCRIBE_SECRETKEY`
+  - [ ] `DEEPGRAM_APIKEY`
+  - [ ] `ELEVENLABS_APIKEY`
+  - [ ] `OPENAI_APIKEY`
+  - [ ] `OPENAI_DEFAULTMODEL`
 
 ### 6. Konfigurationsdateien prüfen
 - [ ] Bestätigen, dass `.github/workflows/pr-preview.yml` existiert
@@ -96,7 +126,7 @@ Falls ein Schritt fehlschlägt, konsultieren Sie:
   ```bash
   az containerapp logs show \
     --name speakstorelocate-pr-{NUMMER} \
-    --resource-group speakstorelocate-rg \
+    --resource-group speakstorelocate \
     --follow
   ```
 

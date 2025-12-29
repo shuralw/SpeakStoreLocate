@@ -34,8 +34,32 @@ Erstellen Sie eine Resource Group für die Preview-Umgebungen:
 
 ```bash
 az group create \
-  --name speakstorelocate-rg \
-  --location westeurope
+  --name speakstorelocate \
+  --location germanywestcentral
+```
+
+### Schritt 1.5: Azure Resource Provider registrieren (einmalig)
+
+Azure Container Apps benötigt registrierte Resource Provider auf Subscription-Ebene. Wenn diese noch nicht registriert sind, versucht die Azure CLI sie automatisch zu registrieren – das scheitert aber, wenn der Service Principal nur Rechte auf Resource-Group-Ebene hat.
+
+Führen Sie diese Schritte **einmalig** mit einem Benutzer aus, der auf der Subscription mindestens **Contributor** (oder Owner) hat:
+
+```bash
+az provider register --namespace Microsoft.App --wait
+az provider register --namespace Microsoft.OperationalInsights --wait
+az provider register --namespace Microsoft.ContainerRegistry --wait
+```
+
+Optional (je nach Setup):
+
+```bash
+az provider register --namespace Microsoft.ManagedIdentity --wait
+```
+
+Status prüfen:
+
+```bash
+az provider show -n Microsoft.App --query registrationState -o tsv
 ```
 
 ### Schritt 2: Service Principal erstellen
@@ -47,7 +71,7 @@ Erstellen Sie einen Service Principal für GitHub Actions:
 az ad sp create-for-rbac \
   --name "SpeakStoreLocate-PR-Preview" \
   --role contributor \
-  --scopes /subscriptions/{subscription-id}/resourceGroups/speakstorelocate-rg \
+  --scopes /subscriptions/{subscription-id}/resourceGroups/speakstorelocate \
   --sdk-auth
 ```
 
@@ -74,7 +98,57 @@ Beispiel-Ausgabe:
 | Secret Name | Wert | Beschreibung |
 |------------|------|--------------|
 | `AZURE_CREDENTIALS` | Die komplette JSON-Ausgabe aus Schritt 2 | Für Azure-Authentifizierung |
-| `AZURE_RESOURCE_GROUP` | `speakstorelocate-rg` | Name der Resource Group |
+| `AZURE_RESOURCE_GROUP` | `speakstorelocate` | Name der Resource Group |
+
+Zusätzlich benötigt der Workflow eine **User Assigned Managed Identity** für den Image-Pull aus ACR (damit es nicht zu `ImagePullUnauthorized` kommt und keine ACR Passwörter nötig sind).
+
+### Schritt 3.5: Managed Identity für ACR Pull (empfohlen, einmalig)
+
+Diese Schritte müssen **einmalig** durchgeführt werden (mit Rechten, um Role Assignments auf dem ACR zu setzen).
+
+```bash
+# Variablen anpassen
+RG="speakstorelocate"
+LOCATION="germanywestcentral"
+ACR_NAME="speakstorelocate"
+IDENTITY_NAME="speakstorelocate-acr-pull"
+
+# User Assigned Managed Identity erstellen
+az identity create -g "$RG" -n "$IDENTITY_NAME" -l "$LOCATION"
+
+# AcrPull auf dem ACR vergeben
+ACR_ID=$(az acr show -n "$ACR_NAME" -g "$RG" --query id -o tsv)
+PRINCIPAL_ID=$(az identity show -g "$RG" -n "$IDENTITY_NAME" --query principalId -o tsv)
+az role assignment create --assignee "$PRINCIPAL_ID" --role AcrPull --scope "$ACR_ID"
+
+# Resource ID (für GitHub Variable)
+az identity show -g "$RG" -n "$IDENTITY_NAME" --query id -o tsv
+```
+
+### Schritt 3.6: GitHub Actions Variable setzen
+
+Unter `Settings` → `Secrets and variables` → `Actions` → `Variables` folgende Variable hinzufügen:
+
+| Variable Name | Wert | Beschreibung |
+|--------------|------|--------------|
+| `AZURE_ACR_PULL_IDENTITY_RESOURCE_ID` | Resource ID aus Schritt 3.5 | UAMI für ACR Pull (wird als `--registry-identity` verwendet) |
+
+Zusätzliche Secrets (für das Backend in der Preview-Umgebung):
+
+| Secret Name | Beschreibung |
+|------------|--------------|
+| `AWS_S3_BUCKETNAME` | AWS S3 Bucket Name |
+| `AWS_S3_ACCESSKEY` | AWS Access Key für S3 |
+| `AWS_S3_SECRETKEY` | AWS Secret Key für S3 |
+| `AWS_DYNAMODB_TABLENAME` | DynamoDB Table Name |
+| `AWS_DYNAMODB_ACCESSKEY` | AWS Access Key für DynamoDB |
+| `AWS_DYNAMODB_SECRETKEY` | AWS Secret Key für DynamoDB |
+| `AWS_TRANSCRIBE_ACCESSKEY` | AWS Access Key für Transcribe |
+| `AWS_TRANSCRIBE_SECRETKEY` | AWS Secret Key für Transcribe |
+| `DEEPGRAM_APIKEY` | Deepgram API Key |
+| `ELEVENLABS_APIKEY` | ElevenLabs API Key |
+| `OPENAI_APIKEY` | OpenAI API Key |
+| `OPENAI_DEFAULTMODEL` | Default Model (z.B. `gpt-4.1-nano-2025-04-14`) |
 
 ### Schritt 4: Konfigurationsdateien prüfen
 
@@ -141,7 +215,7 @@ Beispiele:
 - Überprüfen Sie, ob `AZURE_RESOURCE_GROUP` Secret korrekt ist
 - Stellen Sie sicher, dass die Resource Group existiert:
   ```bash
-  az group show --name speakstorelocate-rg
+  az group show --name speakstorelocate
   ```
 
 ### Deployment erfolgreich, aber App startet nicht
@@ -149,7 +223,7 @@ Beispiele:
   ```bash
   az containerapp logs show \
     --name speakstorelocate-pr-{PR_NUMMER} \
-    --resource-group speakstorelocate-rg \
+    --resource-group speakstorelocate \
     --follow
   ```
 - Prüfen Sie, ob das Dockerfile lokal funktioniert:
@@ -162,11 +236,12 @@ Beispiele:
 ```bash
 # Alle Container Apps auflisten
 az containerapp list --resource-group speakstorelocate-rg --output table
+az containerapp list --resource-group speakstorelocate --output table
 
 # Spezifische App löschen
 az containerapp delete \
   --name speakstorelocate-pr-{NUMMER} \
-  --resource-group speakstorelocate-rg \
+  --resource-group speakstorelocate \
   --yes
 ```
 
@@ -201,7 +276,7 @@ az containerapp delete \
    ```bash
    az containerapp secret set \
      --name speakstorelocate-pr-{NUMMER} \
-     --resource-group speakstorelocate-rg \
+     --resource-group speakstorelocate \
      --secrets "key=value"
    ```
 
@@ -209,6 +284,7 @@ az containerapp delete \
 
 1. Öffnen Sie [Azure Portal](https://portal.azure.com)
 2. Navigieren Sie zur Resource Group `speakstorelocate-rg`
+2. Navigieren Sie zur Resource Group `speakstorelocate`
 3. Hier sehen Sie:
    - Alle aktiven Container Apps (Preview-Umgebungen)
    - Container App Environment
