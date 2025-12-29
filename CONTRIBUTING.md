@@ -21,20 +21,31 @@ Before contributing, please:
 
 ### Prerequisites
 - .NET SDK 10.0 or later
+- Node.js 18.x or later (for frontend development)
 - Git
 - A code editor (Visual Studio, VS Code, or Rider recommended)
 
 ### Clone and Setup
+
+**Backend:**
 ```bash
 git clone https://github.com/shuralw/SpeakStoreLocate.git
 cd SpeakStoreLocate
 dotnet restore SpeakStoreLocate.sln
 ```
 
+**Frontend:**
+```bash
+cd SpeakStoreLocate.Client
+npm ci
+```
+
 ## Building and Testing
 
-### Building the Solution
-To build the entire solution:
+### Backend
+
+**Building the Solution:**
+To build the entire backend solution:
 ```bash
 dotnet build SpeakStoreLocate.sln --configuration Release
 ```
@@ -44,25 +55,47 @@ To build a specific project:
 dotnet build SpeakStoreLocate.ApiService/SpeakStoreLocate.ApiService.csproj --configuration Release
 ```
 
-### Running Tests
-To run all tests:
-```bash
-dotnet test SpeakStoreLocate.sln --configuration Release
-```
-
-To run tests for a specific project:
+**Running Backend Tests:**
+To run all backend tests:
 ```bash
 dotnet test SpeakStoreLocate.Tests/SpeakStoreLocate.Tests.csproj --configuration Release
 ```
 
-### Running the Application Locally
+**Running the Backend API Locally:**
 ```bash
 dotnet run --project SpeakStoreLocate.ApiService/SpeakStoreLocate.ApiService.csproj
+```
+
+### Frontend
+
+**Building the Frontend:**
+```bash
+cd SpeakStoreLocate.Client
+npm run build
+```
+
+For development build:
+```bash
+npm run build -- --configuration development
+```
+
+**Running Frontend Tests:**
+```bash
+cd SpeakStoreLocate.Client
+npm test -- --watch=false --browsers=ChromeHeadless
+```
+
+**Running the Frontend Locally:**
+```bash
+cd SpeakStoreLocate.Client
+npm start
 ```
 
 ## Pull Request Process
 
 ### Before Submitting a PR
+
+**For Backend Changes:**
 1. **Build locally**: Ensure your code builds without errors
    ```bash
    dotnet build SpeakStoreLocate.sln --configuration Release
@@ -70,19 +103,32 @@ dotnet run --project SpeakStoreLocate.ApiService/SpeakStoreLocate.ApiService.csp
 
 2. **Run tests**: Verify all tests pass
    ```bash
-   dotnet test SpeakStoreLocate.sln --configuration Release
+   dotnet test SpeakStoreLocate.Tests/SpeakStoreLocate.Tests.csproj --configuration Release
    ```
 
-3. **Commit your changes**: Use clear, descriptive commit messages
+**For Frontend Changes:**
+1. **Build locally**: Ensure your code builds without errors
    ```bash
-   git add .
-   git commit -m "Add feature: description of your changes"
+   cd SpeakStoreLocate.Client
+   npm run build -- --configuration development
    ```
 
-4. **Push to your fork**: Push your branch to your GitHub fork
+2. **Run tests**: Verify all tests pass
    ```bash
-   git push origin your-feature-branch
+   cd SpeakStoreLocate.Client
+   npm test -- --watch=false --browsers=ChromeHeadless
    ```
+
+**Commit your changes:**
+```bash
+git add .
+git commit -m "Add feature: description of your changes"
+```
+
+**Push to your fork:**
+```bash
+git push origin your-feature-branch
+```
 
 ### Creating the Pull Request
 1. Navigate to the [repository on GitHub](https://github.com/shuralw/SpeakStoreLocate)
@@ -97,15 +143,25 @@ dotnet run --project SpeakStoreLocate.ApiService/SpeakStoreLocate.ApiService.csp
 ### PR Build Validation
 **All pull requests to the `master` branch must pass automated build validation before they can be merged.**
 
-When you submit a PR:
-1. GitHub Actions will automatically trigger the "PR Build Validation" workflow
-2. The workflow will:
-   - Checkout your code
-   - Setup the .NET environment
-   - Restore dependencies
-   - Build the solution
-   - Run all tests
-3. The PR can only be merged if all checks pass ✅
+The validation workflow intelligently detects which parts of the codebase changed:
+
+**Backend Changes:**
+When you modify backend files (ApiService, AppHost, ServiceDefaults, Tests, or solution files), the workflow will:
+1. Setup the .NET environment
+2. Restore dependencies
+3. Build the solution in Release configuration
+4. Run all unit tests
+5. Build Docker image (if Dockerfile exists)
+
+**Frontend Changes:**
+When you modify frontend files (SpeakStoreLocate.Client), the workflow will:
+1. Setup Node.js environment
+2. Install npm dependencies
+3. Build the Angular application
+4. Run frontend tests
+
+**Both:**
+If your PR changes both backend and frontend, both validation jobs will run.
 
 You can view the build status:
 - In the PR page under "Checks"

@@ -51,11 +51,13 @@ Enable the following options:
 #### ✅ Require status checks to pass before merging
 - Check: **Require branches to be up to date before merging**
 - In the search box under **Status checks that are required**, add:
-  - `build-and-test` (the job name from PR Build Validation workflow)
+  - `backend-build-and-test` (for backend validation)
+  - `frontend-build-and-test` (for frontend validation)
   
-  **Note**: The status check will only appear in the list after the workflow has run at least once. You may need to:
+  **Note**: The status checks will only appear in the list after the workflow has run at least once. You may need to:
   1. Create a test PR first to trigger the workflow
-  2. Then add the status check to branch protection
+  2. Then add the status checks to branch protection
+  3. Both checks are required to ensure comprehensive validation
 
 #### ✅ Do not allow bypassing the above settings
 - This ensures even administrators follow the same rules
@@ -95,31 +97,59 @@ After configuring branch protection:
 
 **Trigger**: Pull requests targeting the `master` branch
 
+**Jobs**:
+
+#### Backend Build and Test
+Runs when backend files are modified:
+- `SpeakStoreLocate.ApiService/**`
+- `SpeakStoreLocate.AppHost/**`
+- `SpeakStoreLocate.ServiceDefaults/**`
+- `SpeakStoreLocate.Tests/**`
+- `SpeakStoreLocate.sln`
+- `global.json`
+
 **Steps**:
 1. **Checkout Code** - Clones the PR branch
-2. **Setup .NET** - Installs .NET SDK 10.0.x
-3. **Restore Dependencies** - Runs `dotnet restore`
-4. **Build Solution** - Builds in Release configuration
-5. **Run Tests** - Executes all unit tests
+2. **Check for backend changes** - Uses path filters to detect backend changes
+3. **Setup .NET** - Installs .NET SDK 10.0.x
+4. **Restore Dependencies** - Runs `dotnet restore`
+5. **Build Solution** - Builds in Release configuration
+6. **Run Tests** - Executes all unit tests
+7. **Build Docker Image** - Validates Docker build (if Dockerfile exists)
 
-**Duration**: Typically 1-3 minutes
+#### Frontend Build and Test
+Runs when frontend files are modified:
+- `SpeakStoreLocate.Client/**`
+
+**Steps**:
+1. **Checkout Code** - Clones the PR branch
+2. **Check for frontend changes** - Uses path filters to detect frontend changes
+3. **Setup Node.js** - Installs Node.js 18.x
+4. **Install Dependencies** - Runs `npm ci`
+5. **Build Frontend** - Builds Angular application
+6. **Run Tests** - Executes frontend unit tests with Karma
+
+**Duration**: 
+- Backend: Typically 1-3 minutes
+- Frontend: Typically 2-4 minutes
 
 **Failure Scenarios**:
 - Compilation errors in the code
 - Failing unit tests
 - Missing dependencies
 - Invalid project configuration
+- Docker build failures (backend only, if Dockerfile present)
 
 ## Troubleshooting
 
 ### Status Check Not Appearing
 
-If the `build-and-test` status check doesn't appear in the branch protection settings:
+If the `backend-build-and-test` or `frontend-build-and-test` status checks don't appear in the branch protection settings:
 
-1. Create a draft PR to master
-2. Wait for the workflow to complete
+1. Create a test PR to master that modifies both backend and frontend files
+2. Wait for both workflow jobs to complete
 3. Return to branch protection settings
-4. The status check should now be available in the search
+4. Both status checks should now be available in the search
 
 ### Workflow Not Running
 
@@ -128,7 +158,8 @@ If the workflow doesn't trigger on PRs:
 1. Check `.github/workflows/pr-build-validation.yml` exists
 2. Verify the workflow syntax is valid
 3. Ensure the PR targets the `master` branch
-4. Check the Actions tab for any workflow errors
+4. Check if your changes match the path filters (backend or frontend paths)
+5. Check the Actions tab for any workflow errors
 
 ### Build Failing on PR
 
@@ -137,9 +168,18 @@ If your PR build is failing:
 1. Click on the "Details" link next to the failed check
 2. Review the workflow logs to identify the error
 3. Fix the issue locally:
+   
+   **For backend:**
    ```bash
    dotnet build SpeakStoreLocate.sln --configuration Release
-   dotnet test SpeakStoreLocate.sln --configuration Release
+   dotnet test SpeakStoreLocate.Tests/SpeakStoreLocate.Tests.csproj --configuration Release
+   ```
+   
+   **For frontend:**
+   ```bash
+   cd SpeakStoreLocate.Client
+   npm run build -- --configuration development
+   npm test -- --watch=false --browsers=ChromeHeadless
    ```
 4. Commit and push the fix
 5. The workflow will automatically re-run
@@ -167,7 +207,7 @@ In rare emergency situations, repository administrators can:
 When updating `.github/workflows/pr-build-validation.yml`:
 
 1. Test changes in a fork or feature branch first
-2. Ensure the job name (`build-and-test`) remains consistent
+2. Ensure the job names (`backend-build-and-test` and `frontend-build-and-test`) remain consistent
 3. If changing the job name, update branch protection settings accordingly
 
 ## References

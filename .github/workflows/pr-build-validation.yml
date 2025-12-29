@@ -7,8 +7,8 @@ on:
       - master
 
 jobs:
-  build-and-test:
-    name: Build and Test
+  backend-build-and-test:
+    name: Backend Build and Test
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -17,20 +17,97 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
+      - name: Check for backend changes
+        id: backend-filter
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            backend:
+              - 'SpeakStoreLocate.ApiService/**'
+              - 'SpeakStoreLocate.AppHost/**'
+              - 'SpeakStoreLocate.ServiceDefaults/**'
+              - 'SpeakStoreLocate.Tests/**'
+              - 'SpeakStoreLocate.sln'
+              - 'global.json'
+              - '.github/workflows/pr-build-validation.yml'
+
       - name: Setup .NET
+        if: steps.backend-filter.outputs.backend == 'true'
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '10.0.x'
 
       - name: Restore Dependencies
+        if: steps.backend-filter.outputs.backend == 'true'
         run: dotnet restore SpeakStoreLocate.sln
 
       - name: Build Solution
+        if: steps.backend-filter.outputs.backend == 'true'
         run: |
           dotnet build SpeakStoreLocate.sln \
             --configuration Release --no-restore
 
       - name: Run Tests
+        if: steps.backend-filter.outputs.backend == 'true'
         run: |
           dotnet test SpeakStoreLocate.Tests/SpeakStoreLocate.Tests.csproj \
             --configuration Release --no-build --verbosity normal
+
+      - name: Check if Dockerfile exists
+        if: steps.backend-filter.outputs.backend == 'true'
+        id: dockerfile-check
+        run: |
+          if [ -f "./SpeakStoreLocate.ApiService/Dockerfile" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Docker Image
+        if: |
+          steps.backend-filter.outputs.backend == 'true' &&
+          steps.dockerfile-check.outputs.exists == 'true'
+        run: |
+          docker build -f ./SpeakStoreLocate.ApiService/Dockerfile \
+            -t speakstorelocate-api:pr-${{ github.event.pull_request.number }} .
+
+  frontend-build-and-test:
+    name: Frontend Build and Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Check for frontend changes
+        id: frontend-filter
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            frontend:
+              - 'SpeakStoreLocate.Client/**'
+
+      - name: Setup Node.js
+        if: steps.frontend-filter.outputs.frontend == 'true'
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: SpeakStoreLocate.Client/package-lock.json
+
+      - name: Install Dependencies
+        if: steps.frontend-filter.outputs.frontend == 'true'
+        working-directory: SpeakStoreLocate.Client
+        run: npm ci
+
+      - name: Build Frontend
+        if: steps.frontend-filter.outputs.frontend == 'true'
+        working-directory: SpeakStoreLocate.Client
+        run: npm run build -- --configuration development
+
+      - name: Run Tests
+        if: steps.frontend-filter.outputs.frontend == 'true'
+        working-directory: SpeakStoreLocate.Client
+        run: npm test -- --watch=false --browsers=ChromeHeadless
