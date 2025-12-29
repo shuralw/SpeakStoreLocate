@@ -127,11 +127,14 @@ az identity show -g "$RG" -n "$IDENTITY_NAME" --query id -o tsv
 
 ### Schritt 3.6: GitHub Actions Variable setzen
 
-Unter `Settings` → `Secrets and variables` → `Actions` → `Variables` folgende Variable hinzufügen:
+Unter `Settings` → `Secrets and variables` → `Actions` → `Variables` (oder alternativ unter `Secrets`) folgende Variable hinzufügen:
+
+> **Hinweis**: `AZURE_ACR_PULL_IDENTITY_RESOURCE_ID` kann entweder als **Variable** oder als **Secret** gespeichert werden. Der Workflow unterstützt beide Varianten. Empfohlen wird die Speicherung als Variable, da es sich um eine nicht-sensitive Resource ID handelt.
 
 | Variable Name | Wert | Beschreibung |
 |--------------|------|--------------|
 | `AZURE_ACR_PULL_IDENTITY_RESOURCE_ID` | Resource ID aus Schritt 3.5 | UAMI für ACR Pull (wird als `--registry-identity` verwendet) |
+
 
 Zusätzliche Secrets (für das Backend in der Preview-Umgebung):
 

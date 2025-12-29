@@ -8,7 +8,9 @@ env:
   RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
   LOCATION: germanywestcentral
   ACR_NAME: speakstorelocate
-  ACR_PULL_IDENTITY_RESOURCE_ID: ${{ vars.AZURE_ACR_PULL_IDENTITY_RESOURCE_ID }}
+  # Support both secrets and variables for ACR_PULL_IDENTITY_RESOURCE_ID
+  # Prefer secrets if set, fall back to variables
+  ACR_PULL_IDENTITY_RESOURCE_ID: ${{ secrets.AZURE_ACR_PULL_IDENTITY_RESOURCE_ID || vars.AZURE_ACR_PULL_IDENTITY_RESOURCE_ID }}
 
 jobs:
   deploy:
@@ -145,7 +147,7 @@ jobs:
           )
 
           if [ -z "$ACR_PULL_IDENTITY_RESOURCE_ID" ]; then
-            echo "AZURE_ACR_PULL_IDENTITY_RESOURCE_ID repo variable is not set. Configure it in GitHub: Settings → Secrets and variables → Actions → Variables."
+            echo "AZURE_ACR_PULL_IDENTITY_RESOURCE_ID is not set. Configure it in GitHub: Settings → Secrets and variables → Actions → Variables (or Secrets)."
             exit 1
           fi
 
@@ -212,7 +214,7 @@ jobs:
           LOGIN_SERVER="${{ steps.acr.outputs.login_server }}"
 
           if [ -z "$ACR_PULL_IDENTITY_RESOURCE_ID" ]; then
-            echo "AZURE_ACR_PULL_IDENTITY_RESOURCE_ID repo variable is not set. Configure it in GitHub: Settings → Secrets and variables → Actions → Variables."
+            echo "AZURE_ACR_PULL_IDENTITY_RESOURCE_ID is not set. Configure it in GitHub: Settings → Secrets and variables → Actions → Variables (or Secrets)."
             exit 1
           fi
 
