@@ -47,10 +47,17 @@ jobs:
       - name: Resolve ACR login server
         id: acr
         run: |
+          set -e
           ACR_LOGIN_SERVER=$(az acr show \
             --name $ACR_NAME \
             --resource-group $RESOURCE_GROUP \
-            --query loginServer -o tsv)
+            --query loginServer -o tsv || true)
+
+          if [ -z "$ACR_LOGIN_SERVER" ]; then
+            echo "Error: Failed to resolve ACR login server. Ensure Azure Container Registry '$ACR_NAME' exists in resource group '$RESOURCE_GROUP'." >&2
+            exit 1
+          fi
+
           echo "login_server=$ACR_LOGIN_SERVER" >> $GITHUB_OUTPUT
 
       - name: ACR Login
@@ -296,6 +303,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.action == 'closed'
     permissions:
+      contents: read
       pull-requests: write
 
     steps:

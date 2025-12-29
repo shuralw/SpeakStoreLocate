@@ -99,7 +99,7 @@ Diese Checkliste hilft Repository-Maintainern bei der Einrichtung der automatisi
 ### 9. PR-Kommentar überprüfen
 - [ ] Zum Test-Pull-Request gehen
 - [ ] Nach Kommentar "🚀 Preview-Umgebung bereitgestellt" suchen
-- [ ] Preview-URL notieren (z.B. `https://speakstorelocate-pr-1.westeurope.azurecontainerapps.io`)
+- [ ] Preview-URL notieren (z.B. `https://speakstorelocate-api-pr-1.germanywestcentral.azurecontainerapps.io`)
 
 ### 10. Preview-Umgebung testen
 - [ ] Auf Preview-URL klicken

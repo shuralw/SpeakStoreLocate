@@ -31,8 +31,8 @@ https://speakstorelocate-pr-{PR_NUMBER}.{region}.azurecontainerapps.io
 ```
 
 Beispiele:
-- PR #42: `https://speakstorelocate-pr-42.westeurope.azurecontainerapps.io`
-- PR #123: `https://speakstorelocate-pr-123.westeurope.azurecontainerapps.io`
+- PR #42: `https://speakstorelocate-api-pr-42.germanywestcentral.azurecontainerapps.io`
+- PR #123: `https://speakstorelocate-client-pr-123.germanywestcentral.azurecontainerapps.io`
 
 ## Einrichtung
 
@@ -102,8 +102,8 @@ Die Anwendung wird auf Azure Container Apps deployed:
 
 ```yaml
 Environment: speakstorelocate-env
-Region: westeurope (West Europa)
-Umgebungsvariable: ASPNETCORE_ENVIRONMENT=Staging
+Region: germanywestcentral (Deutschland West-Mitte)
+Umgebungsvariable: ASPNETCORE_ENVIRONMENT=Development
 Min Replicas: 0 (Auto-Scale auf 0)
 Max Replicas: 1
 Ingress: External (HTTPS)
@@ -166,7 +166,7 @@ Port: 8080
 Jede Preview-Umgebung verwendet:
 - **CPU**: 0.25 vCPU
 - **RAM**: 0.5 GB
-- **Region**: West Europa (westeurope)
+- **Region**: Deutschland West-Mitte (germanywestcentral)
 - **Scale to Zero**: Aktiviert (spart Kosten)
 - **Container Registry**: Shared ACR für alle Previews
 
