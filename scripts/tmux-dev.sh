@@ -19,23 +19,42 @@ if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
   exit 0
 fi
 
-tmux new-session -d -s "$SESSION_NAME" -n api
+tmux new-session -d -s "$SESSION_NAME" -n dev
 
-tmux send-keys -t "$SESSION_NAME":api "cd \"$API_DIR\" && dotnet watch run" C-m
+# 2x2 Pane layout:
+#   [0] top-left  = api
+#   [1] top-right = client
+#   [2] bot-left  = tests
+#   [3] bot-right = logs
 
-tmux new-window -t "$SESSION_NAME" -n client
+# Important: target panes explicitly (detached sessions can have surprising "current pane" state).
+# Split right (client)
+tmux split-window -t "$SESSION_NAME":dev.0 -h
+# Split bottom-left (tests)
+tmux split-window -t "$SESSION_NAME":dev.0 -v
+# Split bottom-right (logs)
+tmux split-window -t "$SESSION_NAME":dev.1 -v
+
+# Normalize layout to a clean 2x2 grid
+tmux select-layout -t "$SESSION_NAME":dev tiled
+
+# Pane titles (make them visible in pane borders)
+tmux set-option -t "$SESSION_NAME":dev pane-border-status top
+tmux set-option -t "$SESSION_NAME":dev pane-border-format " #{pane_title} "
+tmux select-pane -t "$SESSION_NAME":dev.0 -T "api"
+tmux select-pane -t "$SESSION_NAME":dev.1 -T "client"
+tmux select-pane -t "$SESSION_NAME":dev.2 -T "tests"
+tmux select-pane -t "$SESSION_NAME":dev.3 -T "logs"
+
+# Commands
+tmux send-keys -t "$SESSION_NAME":dev.0 "cd \"$API_DIR\" && dotnet watch run" C-m
+
 # Only install deps if node_modules is missing
+tmux send-keys -t "$SESSION_NAME":dev.1 "cd \"$CLIENT_DIR\" && if [ ! -d node_modules ]; then npm install; fi && npm run start" C-m
 
-tmux send-keys -t "$SESSION_NAME":client "cd \"$CLIENT_DIR\" && if [ ! -d node_modules ]; then npm install; fi && npm run start" C-m
+tmux send-keys -t "$SESSION_NAME":dev.2 "cd \"$TESTS_DIR\" && dotnet watch test" C-m
 
-tmux new-window -t "$SESSION_NAME" -n tests
+tmux send-keys -t "$SESSION_NAME":dev.3 "cd \"$API_DIR\" && (ls -1 logs 2>/dev/null || true); tail -F logs/*.log 2>/dev/null || echo 'No log files yet (waiting for first write)...'" C-m
 
-tmux send-keys -t "$SESSION_NAME":tests "cd \"$TESTS_DIR\" && dotnet watch test" C-m
-
-tmux new-window -t "$SESSION_NAME" -n logs
-
-tmux send-keys -t "$SESSION_NAME":logs "cd \"$API_DIR\" && (ls -1 logs 2>/dev/null || true); tail -F logs/*.log 2>/dev/null || echo 'No log files yet (waiting for first write)...'" C-m
-
-tmux select-window -t "$SESSION_NAME":api
-
+tmux select-pane -t "$SESSION_NAME":dev.0
 tmux attach -t "$SESSION_NAME"
