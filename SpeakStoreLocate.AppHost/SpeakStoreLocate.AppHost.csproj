@@ -7,6 +7,7 @@
     <Nullable>enable</Nullable>
     <IsAspireHost>true</IsAspireHost>
     <UserSecretsId>b9513e69-5ef1-4d13-8e58-0be05fca4b1e</UserSecretsId>
+    <RestoreUseStaticGraphEvaluation>false</RestoreUseStaticGraphEvaluation>
   </PropertyGroup>
 
   <ItemGroup>
