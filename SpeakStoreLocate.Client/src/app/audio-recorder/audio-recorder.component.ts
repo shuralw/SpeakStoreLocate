@@ -26,9 +26,10 @@ export interface PendingUpload {
 }
 
 @Component({
-  selector: 'app-audio-recorder',
-  templateUrl: './audio-recorder.component.html',
-  styleUrls: ['./audio-recorder.component.scss'],
+    selector: 'app-audio-recorder',
+    templateUrl: './audio-recorder.component.html',
+    styleUrls: ['./audio-recorder.component.scss'],
+    standalone: false
 })
 export class AudioRecorderComponent implements OnInit {
 
