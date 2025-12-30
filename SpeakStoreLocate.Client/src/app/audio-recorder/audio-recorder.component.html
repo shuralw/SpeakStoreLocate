@@ -11,7 +11,7 @@
         </mat-card-header>
         <mat-card-content>
           <div class="upload-list">
-            @for (upload of pendingUploadsActive; track upload) {
+            @for (upload of pendingUploadsActive; track upload.id) {
               <div class="upload-item">
                 <div class="upload-info">
                   <span class="duration">{{formatDuration(upload.duration)}}</span>

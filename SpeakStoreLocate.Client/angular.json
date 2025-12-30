@@ -113,15 +113,6 @@
     "analytics": "ed9dedb4-6597-4b9f-9270-3409f52b72bd"
   },
   "schematics": {
-    "@schematics/angular:component": {
-      "type": "component"
-    },
-    "@schematics/angular:directive": {
-      "type": "directive"
-    },
-    "@schematics/angular:service": {
-      "type": "service"
-    },
     "@schematics/angular:guard": {
       "typeSeparator": "."
     },
