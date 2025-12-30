@@ -14,6 +14,7 @@ import { UserIdService, USER_ID_REGEX } from '../../services/user-id.service';
     selector: 'app-user-id-bar',
     templateUrl: './user-id-bar.component.html',
     styleUrls: ['./user-id-bar.component.scss'],
+    standalone: false
 })
 export class UserIdBarComponent implements OnInit, OnDestroy {
     readonly pattern = '[A-Za-z0-9_\\-]{1,64}';
