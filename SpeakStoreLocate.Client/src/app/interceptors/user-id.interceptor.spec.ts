@@ -1,5 +1,5 @@
-import { HTTP_INTERCEPTORS, HttpClient } from '@angular/common/http';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { HTTP_INTERCEPTORS, HttpClient, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { UserIdInterceptor } from './user-id.interceptor';
 import { UserIdService } from '../services/user-id.service';
@@ -28,12 +28,14 @@ describe('UserIdInterceptor', () => {
     userIdServiceStub = new UserIdServiceStub();
 
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [
+    imports: [],
+    providers: [
         { provide: HTTP_INTERCEPTORS, useClass: UserIdInterceptor, multi: true },
         { provide: UserIdService, useValue: userIdServiceStub },
-      ],
-    });
+        provideHttpClient(withInterceptorsFromDi()),
+        provideHttpClientTesting(),
+    ]
+});
 
     http = TestBed.inject(HttpClient);
     httpMock = TestBed.inject(HttpTestingController);
