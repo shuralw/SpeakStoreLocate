@@ -1,6 +1,24 @@
 # SpeakStoreLocateClient
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 15.0.4.
+This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 15.0.4 and has been upgraded to Angular 21.
+
+## Prerequisites
+
+- Node.js >= 18.19.0
+- npm >= 9.0.0
+
+You can use [nvm](https://github.com/nvm-sh/nvm) to easily switch to the correct Node.js version:
+
+```bash
+nvm use
+```
+
+Or install the required version:
+
+```bash
+nvm install 18.19.0
+nvm use 18.19.0
+```
 
 ## Development server
 
