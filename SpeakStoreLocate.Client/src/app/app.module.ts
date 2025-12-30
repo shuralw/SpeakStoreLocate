@@ -4,7 +4,7 @@ import { BrowserModule } from '@angular/platform-browser';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { AudioRecorderComponent } from './audio-recorder/audio-recorder.component';
-import { HTTP_INTERCEPTORS, HttpClientModule } from '@angular/common/http';
+import { HTTP_INTERCEPTORS, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 import { MatTableModule } from '@angular/material/table';
 import { MatSortModule } from '@angular/material/sort';
 import { MatCardModule } from '@angular/material/card';
@@ -24,37 +24,31 @@ import { UserIdBarComponent } from './components/user-id-bar/user-id-bar.compone
 import { UserIdInterceptor } from './interceptors/user-id.interceptor';
 import { HttpErrorInterceptor } from './interceptors/http-error.interceptor';
 
-@NgModule({
-  declarations: [
-    AppComponent,
-    AudioRecorderComponent,
-    UserIdBarComponent
-  ],
-  imports: [
-    BrowserModule,
-    AppRoutingModule,
-    HttpClientModule,
-    MatTableModule,
-    MatSortModule,
-    MatCardModule,
-    MatButtonModule,
-    MatIconModule,
-    MatProgressBarModule,
-    MatProgressSpinnerModule,
-    MatTooltipModule,
-    BrowserAnimationsModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatToolbarModule,
-    ReactiveFormsModule,
-    FormsModule,
-    MatSnackBarModule,
-    MatChipsModule,
-  ],
-  providers: [
-    { provide: HTTP_INTERCEPTORS, useClass: UserIdInterceptor, multi: true },
-    { provide: HTTP_INTERCEPTORS, useClass: HttpErrorInterceptor, multi: true },
-  ],
-  bootstrap: [AppComponent]
-})
+@NgModule({ declarations: [
+        AppComponent,
+        AudioRecorderComponent,
+        UserIdBarComponent
+    ],
+    bootstrap: [AppComponent], imports: [BrowserModule,
+        AppRoutingModule,
+        MatTableModule,
+        MatSortModule,
+        MatCardModule,
+        MatButtonModule,
+        MatIconModule,
+        MatProgressBarModule,
+        MatProgressSpinnerModule,
+        MatTooltipModule,
+        BrowserAnimationsModule,
+        MatFormFieldModule,
+        MatInputModule,
+        MatToolbarModule,
+        ReactiveFormsModule,
+        FormsModule,
+        MatSnackBarModule,
+        MatChipsModule], providers: [
+        { provide: HTTP_INTERCEPTORS, useClass: UserIdInterceptor, multi: true },
+        { provide: HTTP_INTERCEPTORS, useClass: HttpErrorInterceptor, multi: true },
+        provideHttpClient(withInterceptorsFromDi()),
+    ] })
 export class AppModule { }
