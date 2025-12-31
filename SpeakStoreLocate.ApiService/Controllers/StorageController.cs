@@ -9,6 +9,8 @@ using SpeakStoreLocate.ApiService.Services.Storage;
 using SpeakStoreLocate.ApiService.Services.Transcription;
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
+using Microsoft.Extensions.Options;
+using SpeakStoreLocate.ApiService.Options;
 using SpeakStoreLocate.ApiService.Utilities;
 
 namespace SpeakStoreLocate.ApiService.Controllers;
@@ -19,18 +21,21 @@ namespace SpeakStoreLocate.ApiService.Controllers;
 public class StorageController : ControllerBase
 {
     private readonly ILogger<StorageController> _logger;
+    private readonly LoggingOptions _loggingOptions;
     private readonly ITranscriptionService transcriptionService;
     private readonly IStorageRepository _storageRepository;
     private readonly IInterpretationService _interpretationService;
 
 
-    public StorageController(IConfiguration configuration,
+    public StorageController(
         ITranscriptionService transcriptionService,
         IStorageRepository storageRepository,
         IInterpretationService interpretationService,
-        ILogger<StorageController> logger)
+        ILogger<StorageController> logger,
+        IOptions<LoggingOptions> loggingOptions)
     {
         _logger = logger;
+        _loggingOptions = loggingOptions.Value;
 
         this.transcriptionService = transcriptionService;
         _storageRepository = storageRepository;
@@ -104,13 +109,21 @@ public class StorageController : ControllerBase
 
         _logger.LogInformation("Transcription completed. TranscriptLength={TranscriptLength}", LoggingSanitizer.SafeLength(transcriptedText));
 
-        if (_logger.IsEnabled(LogLevel.Debug))
+        var debugPayloadEnabled = _loggingOptions.DebugPayload.Enabled;
+        var maxPayloadLength = _loggingOptions.DebugPayload.MaxLength;
+        if (debugPayloadEnabled || _logger.IsEnabled(LogLevel.Debug))
         {
-            // Debug-only: transcript text can be large/sensitive
-            const int maxDebugTranscriptLength = 20000;
-            var truncated = LoggingSanitizer.Truncate(transcriptedText, maxDebugTranscriptLength);
-            var suffix = transcriptedText != null && transcriptedText.Length > maxDebugTranscriptLength ? "…(truncated)" : string.Empty;
-            _logger.LogDebug("Transcription text (debug). Transcript={Transcript}{Suffix}", truncated, suffix);
+            var truncated = LoggingSanitizer.Truncate(transcriptedText, maxPayloadLength);
+            var suffix = transcriptedText != null && transcriptedText.Length > maxPayloadLength ? "…(truncated)" : string.Empty;
+
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug("Transcription text (payload). Transcript={Transcript}{Suffix}", truncated, suffix);
+            }
+            else
+            {
+                _logger.LogInformation("Transcription text (payload). Transcript={Transcript}{Suffix}", truncated, suffix);
+            }
         }
 
         var existingLocations = (await this._storageRepository.GetStorageLocations());
@@ -124,9 +137,8 @@ public class StorageController : ControllerBase
 
         _logger.LogInformation("Interpretation completed. CommandCount={CommandCount}", commands?.Count ?? 0);
 
-        if (_logger.IsEnabled(LogLevel.Debug))
+        if (debugPayloadEnabled || _logger.IsEnabled(LogLevel.Debug))
         {
-            // Debug-only: show parsed commands as JSON
             var commandJson = System.Text.Json.JsonSerializer.Serialize(
                 commands,
                 new System.Text.Json.JsonSerializerOptions
@@ -135,10 +147,17 @@ public class StorageController : ControllerBase
                     PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
                 });
 
-            const int maxDebugCommandsLength = 20000;
-            var truncated = LoggingSanitizer.Truncate(commandJson, maxDebugCommandsLength);
-            var suffix = commandJson.Length > maxDebugCommandsLength ? "…(truncated)" : string.Empty;
-            _logger.LogDebug("Commands JSON (debug). CommandsJson={CommandsJson}{Suffix}", truncated, suffix);
+            var truncated = LoggingSanitizer.Truncate(commandJson, maxPayloadLength);
+            var suffix = commandJson.Length > maxPayloadLength ? "…(truncated)" : string.Empty;
+
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug("Commands JSON (payload). CommandsJson={CommandsJson}{Suffix}", truncated, suffix);
+            }
+            else
+            {
+                _logger.LogInformation("Commands JSON (payload). CommandsJson={CommandsJson}{Suffix}", truncated, suffix);
+            }
         }
 
         var performedActions = await _storageRepository.PerformActions(commands);

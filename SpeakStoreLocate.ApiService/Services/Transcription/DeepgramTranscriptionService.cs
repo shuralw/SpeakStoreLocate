@@ -17,17 +17,20 @@ public class DeepgramTranscriptionService : ITranscriptionService
     private readonly IAmazonS3 _s3Client;
     private readonly AmazonS3Options _s3Options;
     private readonly ILogger<DeepgramTranscriptionService> _logger;
+    private readonly LoggingOptions _loggingOptions;
 
     public DeepgramTranscriptionService(
         IOptions<DeepgramOptions> deepgramOptions,
         IAmazonS3 s3Client,
         IOptions<AmazonS3Options> s3Options,
-        ILogger<DeepgramTranscriptionService> logger)
+        ILogger<DeepgramTranscriptionService> logger,
+        IOptions<LoggingOptions> loggingOptions)
     {
         _deepgramClient = ClientFactory.CreateListenRESTClient(deepgramOptions.Value.ApiKey);
         _s3Client = s3Client;
         _s3Options = s3Options.Value;
         _logger = logger;
+        _loggingOptions = loggingOptions.Value;
     }
 
     public async Task<string> TranscriptAudioAsync_Local(AudioUploadRequest request)
@@ -55,13 +58,22 @@ public class DeepgramTranscriptionService : ITranscriptionService
                     SmartFormat = true,
                 });
 
-            if (_logger.IsEnabled(LogLevel.Debug))
+            var debugPayloadEnabled = _loggingOptions.DebugPayload.Enabled;
+            var maxPayloadLength = _loggingOptions.DebugPayload.MaxLength;
+            if (debugPayloadEnabled || _logger.IsEnabled(LogLevel.Debug))
             {
-                var responseJson = JsonSerializer.Serialize(response, new JsonSerializerOptions
+                var responseJson = JsonSerializer.Serialize(response, new JsonSerializerOptions { WriteIndented = true });
+                var truncated = LoggingSanitizer.Truncate(responseJson, maxPayloadLength);
+                var suffix = responseJson.Length > maxPayloadLength ? "…(truncated)" : string.Empty;
+
+                if (_logger.IsEnabled(LogLevel.Debug))
                 {
-                    WriteIndented = true
-                });
-                _logger.LogDebug("Deepgram local response JSON (debug). Response={Response}", responseJson);
+                    _logger.LogDebug("Deepgram local response JSON (payload). Response={Response}{Suffix}", truncated, suffix);
+                }
+                else
+                {
+                    _logger.LogInformation("Deepgram local response JSON (payload). Response={Response}{Suffix}", truncated, suffix);
+                }
             }
 
             var transcript = response?.Results?.Channels?.FirstOrDefault()?.Alternatives?.FirstOrDefault()?.Transcript ?? string.Empty;
@@ -104,13 +116,22 @@ public class DeepgramTranscriptionService : ITranscriptionService
                     SmartFormat = true,
                 });
 
-            if (_logger.IsEnabled(LogLevel.Debug))
+            var debugPayloadEnabled = _loggingOptions.DebugPayload.Enabled;
+            var maxPayloadLength = _loggingOptions.DebugPayload.MaxLength;
+            if (debugPayloadEnabled || _logger.IsEnabled(LogLevel.Debug))
             {
-                var responseJson = JsonSerializer.Serialize(response, new JsonSerializerOptions
+                var responseJson = JsonSerializer.Serialize(response, new JsonSerializerOptions { WriteIndented = true });
+                var truncated = LoggingSanitizer.Truncate(responseJson, maxPayloadLength);
+                var suffix = responseJson.Length > maxPayloadLength ? "…(truncated)" : string.Empty;
+
+                if (_logger.IsEnabled(LogLevel.Debug))
                 {
-                    WriteIndented = true
-                });
-                _logger.LogDebug("Deepgram response JSON (debug). Response={Response}", responseJson);
+                    _logger.LogDebug("Deepgram response JSON (payload). Response={Response}{Suffix}", truncated, suffix);
+                }
+                else
+                {
+                    _logger.LogInformation("Deepgram response JSON (payload). Response={Response}{Suffix}", truncated, suffix);
+                }
             }
 
             // 1. Für jeden Kanal die beste Alternative herausholen

@@ -11,18 +11,30 @@ public class Program
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
-        string env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+        var env = builder.Environment.EnvironmentName;
 
         // 1. Logging Configuration
         builder.AddSerilogLogging();
 
         builder.Configuration
             .AddJsonFile("appsettings.json", false, true)
+            // Thematic config files (hobby-project friendly)
+            .AddJsonFile("appsettings.Logging.json", true, true)
+            .AddJsonFile("appsettings.Cors.json", true, true)
+            .AddJsonFile("appsettings.Aws.json", true, true)
+            .AddJsonFile("appsettings.External.json", true, true)
+
+            // Environment overrides
             .AddJsonFile($"appsettings.{env}.json", true, true)
+            .AddJsonFile($"appsettings.Logging.{env}.json", true, true)
+            .AddJsonFile($"appsettings.Cors.{env}.json", true, true)
+            .AddJsonFile($"appsettings.Aws.{env}.json", true, true)
+            .AddJsonFile($"appsettings.External.{env}.json", true, true)
             .AddUserSecrets<Program>()
             .AddEnvironmentVariables();
 
         builder.Services.Configure<OpenAIOptions>(builder.Configuration.GetSection(OpenAIOptions.SectionName));
+        builder.Services.Configure<LoggingOptions>(builder.Configuration.GetSection("Logging"));
         // 2. Service Configuration (Options Pattern with Environment Override)
         builder.Services.AddExternalServiceConfiguration(builder.Configuration);
         builder.Services.AddAwsConfiguration(builder.Configuration);

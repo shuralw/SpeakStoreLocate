@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Serilog;
 using Serilog.Events;
+using SpeakStoreLocate.ApiService.Options;
 
 namespace SpeakStoreLocate.ApiService.Extensions;
 
@@ -21,12 +22,30 @@ public static class SerilogExtensions
 
         // Configure Serilog for the host
         builder.Host.UseSerilog((context, services, configuration) =>
+        {
             configuration
                 .ReadFrom.Configuration(context.Configuration)
                 .ReadFrom.Services(services)
                 .Enrich.FromLogContext()
                 .Enrich.WithProperty("Application", "SpeakStoreLocate.ApiService")
-                .Enrich.WithProperty("Environment", context.HostingEnvironment.EnvironmentName));
+                .Enrich.WithProperty("Environment", context.HostingEnvironment.EnvironmentName);
+
+            // Optional file logging (primarily intended for Production when needed)
+            var loggingOptions = context.Configuration.GetSection("Logging").Get<LoggingOptions>();
+            if (loggingOptions?.File?.Enabled == true)
+            {
+                if (Enum.TryParse<RollingInterval>(loggingOptions.File.RollingInterval, ignoreCase: true, out var rollingInterval) == false)
+                {
+                    rollingInterval = RollingInterval.Day;
+                }
+
+                configuration.WriteTo.File(
+                    path: loggingOptions.File.Path,
+                    rollingInterval: rollingInterval,
+                    retainedFileCountLimit: loggingOptions.File.RetainedFileCountLimit,
+                    outputTemplate: loggingOptions.File.OutputTemplate);
+            }
+        });
 
         return builder;
     }
