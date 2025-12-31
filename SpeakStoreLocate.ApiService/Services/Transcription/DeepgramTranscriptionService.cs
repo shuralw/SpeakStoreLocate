@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using SpeakStoreLocate.ApiService.Models;
 using SpeakStoreLocate.ApiService.Options;
 using System.Diagnostics;
+using System.Text.Json;
 using SpeakStoreLocate.ApiService.Utilities;
 
 namespace SpeakStoreLocate.ApiService.Services.Transcription;
@@ -54,6 +55,15 @@ public class DeepgramTranscriptionService : ITranscriptionService
                     SmartFormat = true,
                 });
 
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                var responseJson = JsonSerializer.Serialize(response, new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                });
+                _logger.LogDebug("Deepgram local response JSON (debug). Response={Response}", responseJson);
+            }
+
             var transcript = response?.Results?.Channels?.FirstOrDefault()?.Alternatives?.FirstOrDefault()?.Transcript ?? string.Empty;
             _logger.LogInformation("Deepgram local transcription finished. TranscriptLength={TranscriptLength} ElapsedMs={ElapsedMs}",
                 LoggingSanitizer.SafeLength(transcript),
@@ -93,6 +103,15 @@ public class DeepgramTranscriptionService : ITranscriptionService
                     Language = "multi",
                     SmartFormat = true,
                 });
+
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                var responseJson = JsonSerializer.Serialize(response, new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                });
+                _logger.LogDebug("Deepgram response JSON (debug). Response={Response}", responseJson);
+            }
 
             // 1. Für jeden Kanal die beste Alternative herausholen
             var bestTranscriptionPerChannel = response

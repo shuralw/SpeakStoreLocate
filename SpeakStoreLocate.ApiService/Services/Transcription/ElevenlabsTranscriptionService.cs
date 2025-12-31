@@ -72,6 +72,12 @@ public class ElevenlabsTranscriptionService : ITranscriptionService
             // 5) JSON parsen und reines Text-Feld zurückgeben
             var result = JsonSerializer.Deserialize<ScribeResponse>(body,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                // Debug-only: full vendor response JSON (may include additional metadata)
+                _logger.LogDebug("ElevenLabs response JSON (debug). Response={Response}", body);
+            }
             
             var transcript = result?.Text ?? string.Empty;
             _logger.LogInformation("ElevenLabs transcription finished. TranscriptLength={TranscriptLength} ElapsedMs={ElapsedMs}",
