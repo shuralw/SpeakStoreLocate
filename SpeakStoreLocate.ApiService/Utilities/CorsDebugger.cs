@@ -8,25 +8,25 @@ public static class CorsDebugger
     {
         try
         {
-            logger.LogInformation("=== CORS Configuration Debug ===");
+            logger.LogDebug("=== CORS Configuration Debug ===");
             
             var corsService = serviceProvider.GetService<ICorsService>();
             if (corsService != null)
             {
-                logger.LogInformation("CORS Service: {CorsServiceType}", corsService.GetType().Name);
+                logger.LogDebug("CORS Service: {CorsServiceType}", corsService.GetType().Name);
             }
             
             var corsPolicyProvider = serviceProvider.GetService<ICorsPolicyProvider>();
             if (corsPolicyProvider != null)
             {
-                logger.LogInformation("CORS Policy Provider: {ProviderType}", corsPolicyProvider.GetType().Name);
+                logger.LogDebug("CORS Policy Provider: {ProviderType}", corsPolicyProvider.GetType().Name);
             }
 
             // Log environment
             var env = serviceProvider.GetService<IWebHostEnvironment>();
-            logger.LogInformation("Environment: {Environment}", env?.EnvironmentName);
+            logger.LogDebug("Environment: {Environment}", env?.EnvironmentName);
             
-            logger.LogInformation("=== End CORS Configuration Debug ===");
+            logger.LogDebug("=== End CORS Configuration Debug ===");
         }
         catch (Exception ex)
         {

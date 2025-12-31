@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Diagnostics;
 
 namespace SpeakStoreLocate.ApiService.Middleware;
 
@@ -43,6 +44,11 @@ public class UserIdHeaderMiddleware
 
         if (string.IsNullOrWhiteSpace(userId))
         {
+            _logger.LogWarning(
+                "Missing X-User-Id header. Path={Path} Method={Method} TraceIdentifier={TraceIdentifier}",
+                context.Request.Path.ToString(),
+                context.Request.Method,
+                context.TraceIdentifier);
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             await context.Response.WriteAsync("Missing X-User-Id header");
             return;
@@ -50,13 +56,26 @@ public class UserIdHeaderMiddleware
 
         if (!Allowed.IsMatch(userId))
         {
+            _logger.LogWarning(
+                "Invalid X-User-Id header. UserId={UserId} Path={Path} Method={Method} TraceIdentifier={TraceIdentifier}",
+                userId,
+                context.Request.Path.ToString(),
+                context.Request.Method,
+                context.TraceIdentifier);
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             await context.Response.WriteAsync("Invalid X-User-Id header");
             return;
         }
 
         userContext.UserId = userId;
-        using (_logger.BeginScope(new Dictionary<string, object> { ["UserId"] = userId }))
+        var traceId = Activity.Current?.TraceId.ToString();
+        using (_logger.BeginScope(new Dictionary<string, object?>
+               {
+                   ["UserId"] = userId,
+                   ["TraceIdentifier"] = context.TraceIdentifier,
+                   ["TraceId"] = traceId,
+                   ["SpanId"] = Activity.Current?.SpanId.ToString(),
+               }))
         {
             await _next(context);
         }
