@@ -24,6 +24,51 @@
         </mat-slide-toggle>
       </div>
 
+      <div class="flag-row" style="margin-top: 14px;">
+        <div class="flag-text">
+          <div class="name">Archivierte Uploads anzeigen</div>
+          <div class="desc">
+            Zeigt am Seitenende den Archiv-Bereich inkl. Aktionen (löschen/queue/download), ohne das Archivieren selbst zu beeinflussen.
+          </div>
+        </div>
+
+        <mat-slide-toggle
+          [checked]="flags.showArchivedUploadsUi"
+          (change)="onShowArchivedUploadsUiChanged($event.checked)">
+          {{ flags.showArchivedUploadsUi ? 'AN' : 'AUS' }}
+        </mat-slide-toggle>
+      </div>
+
+      <div class="flag-row" style="margin-top: 8px;">
+        <div class="flag-text">
+          <div class="name">Archiv: Download erlauben</div>
+          <div class="desc">
+            Aktiviert den Button zum Herunterladen archivierter Audios.
+          </div>
+        </div>
+
+        <mat-slide-toggle
+          [checked]="flags.enableArchivedDownloads"
+          (change)="onEnableArchivedDownloadsChanged($event.checked)">
+          {{ flags.enableArchivedDownloads ? 'AN' : 'AUS' }}
+        </mat-slide-toggle>
+      </div>
+
+      <div class="flag-row" style="margin-top: 8px;">
+        <div class="flag-text">
+          <div class="name">Archiv: Requeue erlauben</div>
+          <div class="desc">
+            Aktiviert den Button, der archivierte Uploads wieder in die Queue holt.
+          </div>
+        </div>
+
+        <mat-slide-toggle
+          [checked]="flags.enableArchivedRequeue"
+          (change)="onEnableArchivedRequeueChanged($event.checked)">
+          {{ flags.enableArchivedRequeue ? 'AN' : 'AUS' }}
+        </mat-slide-toggle>
+      </div>
+
       <div class="hint">
         Route: <code>/__flags</code>
       </div>

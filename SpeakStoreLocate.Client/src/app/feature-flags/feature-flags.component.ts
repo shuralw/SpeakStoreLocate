@@ -13,4 +13,16 @@ export class FeatureFlagsComponent {
   onLocalSaveChanged(checked: boolean): void {
     this.flags.setLocalSaveInsteadOfBackend(checked);
   }
+
+  onShowArchivedUploadsUiChanged(checked: boolean): void {
+    this.flags.setShowArchivedUploadsUi(checked);
+  }
+
+  onEnableArchivedDownloadsChanged(checked: boolean): void {
+    this.flags.setEnableArchivedDownloads(checked);
+  }
+
+  onEnableArchivedRequeueChanged(checked: boolean): void {
+    this.flags.setEnableArchivedRequeue(checked);
+  }
 }

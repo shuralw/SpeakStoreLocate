@@ -74,7 +74,7 @@ export class AudioRecorderComponent implements OnInit {
   private editingOriginalName: string = '';
   private editingOriginalLocation: string = '';
 
-  constructor(private http: HttpClient, private zone: NgZone, private flags: FeatureFlagsService) { }
+  constructor(private http: HttpClient, private zone: NgZone, public flags: FeatureFlagsService) { }
 
   async ngOnInit() {
     // Restore filter visibility preference
@@ -467,6 +467,97 @@ export class AudioRecorderComponent implements OnInit {
       }
       this.pendingUploads.splice(index, 1);
     }
+  }
+
+  async downloadArchivedUploads(): Promise<void> {
+    const archived = this.pendingUploads.filter(u => !!u.archived);
+    if (archived.length === 0) {
+      this.showResult(false, 'Keine archivierten Uploads vorhanden.');
+      return;
+    }
+
+    // Best-effort: triggers one save/download per file.
+    for (const upload of archived) {
+      const name = this.makeSuggestedFileNameForExistingUpload(upload);
+      try {
+        await this.saveBlobToFileSystem(upload.blob, name);
+      } catch (err) {
+        console.error('[AudioRecorderComponent] Failed to download archived upload:', err);
+        this.showResult(false, 'Download abgebrochen/fehlgeschlagen.');
+        return;
+      }
+    }
+
+    this.showResult(true, `Archivierte Uploads heruntergeladen: ${archived.length}`);
+  }
+
+  async requeueArchivedUploads(): Promise<void> {
+    const archived = this.pendingUploads.filter(u => !!u.archived);
+    if (archived.length === 0) {
+      this.showResult(false, 'Keine archivierten Uploads vorhanden.');
+      return;
+    }
+
+    for (const upload of archived) {
+      upload.archived = false;
+      upload.uploadedAt = undefined;
+      upload.backendResults = undefined;
+      upload.isUploading = false;
+
+      if (upload.id.startsWith('cache-')) {
+        const numericId = parseInt(upload.id.replace('cache-', ''), 10);
+        if (!Number.isNaN(numericId)) {
+          try {
+            await AudioCache.markPending(numericId);
+          } catch (err) {
+            console.error('[AudioRecorderComponent] Failed to mark cached upload pending:', err);
+          }
+        }
+      }
+
+      // Start upload again (will re-archive after success, as in the normal flow).
+      try {
+        await this.uploadAudio(upload, true);
+      } catch (err) {
+        console.error('[AudioRecorderComponent] Requeue upload failed:', err);
+      }
+    }
+
+    this.showResult(true, `Archivierte Uploads in Queue: ${archived.length}`);
+  }
+
+  async clearArchivedUploads(): Promise<void> {
+    const archived = this.pendingUploads.filter(u => !!u.archived);
+    if (archived.length === 0) {
+      this.showResult(false, 'Keine archivierten Uploads vorhanden.');
+      return;
+    }
+
+    for (const upload of archived) {
+      if (upload.id.startsWith('cache-')) {
+        const numericId = parseInt(upload.id.replace('cache-', ''), 10);
+        if (!Number.isNaN(numericId)) {
+          try {
+            await AudioCache.remove(numericId);
+          } catch (err) {
+            console.error('[AudioRecorderComponent] Failed to remove cached upload:', err);
+          }
+        }
+      }
+      if (upload.audioUrl) {
+        URL.revokeObjectURL(upload.audioUrl);
+      }
+    }
+
+    this.pendingUploads = this.pendingUploads.filter(u => !u.archived);
+    this.showResult(true, `Archivierte Uploads gelöscht: ${archived.length}`);
+  }
+
+  private makeSuggestedFileNameForExistingUpload(upload: PendingUpload): string {
+    const baseTs = upload.uploadedAt ? new Date(upload.uploadedAt) : new Date();
+    const ts = baseTs.toISOString().replace(/[:.]/g, '-');
+    const dur = Math.round(upload.duration * 10) / 10;
+    return `archived-${ts}-${dur}s.webm`;
   }
 
   formatDuration(seconds: number): string {
