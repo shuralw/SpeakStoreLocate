@@ -66,11 +66,17 @@ public static class PipelineExtensions
         // 1. Development-specific features
         app.UseDevelopmentDebugging();
 
-        // 2. Request logging
+        // 2. Request logging (records one event per request)
         app.UseSerilogRequestLogging();
 
         // 3. CORS (must be before UseHttpsRedirection)
         app.UseCors("DefaultCorsPolicy");
+
+        // 3.1 Global exception handling (logs unhandled exceptions + returns ProblemDetails)
+        app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+        // 3.2 Request scope enrichment for all logs (TraceId, Path, Origin, etc.)
+        app.UseMiddleware<RequestContextScopeMiddleware>();
 
         // 4. HTTPS Redirection
         app.UseHttpsRedirection();

@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using Serilog;
+using Serilog.Events;
 
 namespace SpeakStoreLocate.ApiService.Extensions;
 
@@ -13,7 +15,8 @@ public static class SerilogExtensions
         Log.Logger = new LoggerConfiguration()
             .ReadFrom.Configuration(builder.Configuration)
             .Enrich.FromLogContext()
-            .WriteTo.Console()
+            .Enrich.WithProperty("Application", "SpeakStoreLocate.ApiService")
+            .Enrich.WithProperty("Environment", builder.Environment.EnvironmentName)
             .CreateBootstrapLogger();
 
         // Configure Serilog for the host
@@ -22,10 +25,8 @@ public static class SerilogExtensions
                 .ReadFrom.Configuration(context.Configuration)
                 .ReadFrom.Services(services)
                 .Enrich.FromLogContext()
-                .WriteTo.Console()
-                .WriteTo.File("./logs/general.log", 
-                    rollingInterval: RollingInterval.Day,
-                    retainedFileCountLimit: 14));
+                .Enrich.WithProperty("Application", "SpeakStoreLocate.ApiService")
+                .Enrich.WithProperty("Environment", context.HostingEnvironment.EnvironmentName));
 
         return builder;
     }
@@ -37,8 +38,66 @@ public static class SerilogExtensions
     {
         app.UseSerilogRequestLogging(options =>
         {
-            // Optional: Customize the request logging options here
-            options.MessageTemplate = "Handled {RequestPath}";
+            options.MessageTemplate =
+                "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
+
+            options.GetLevel = (httpContext, elapsed, ex) =>
+            {
+                if (ex != null)
+                {
+                    return LogEventLevel.Error;
+                }
+
+                var statusCode = httpContext.Response.StatusCode;
+                if (statusCode >= 500)
+                {
+                    return LogEventLevel.Error;
+                }
+
+                if (statusCode >= 400)
+                {
+                    return LogEventLevel.Warning;
+                }
+
+                if (elapsed > 2_000)
+                {
+                    return LogEventLevel.Warning;
+                }
+
+                return LogEventLevel.Information;
+            };
+
+            options.EnrichDiagnosticContext = (diag, ctx) =>
+            {
+                // Correlation / tracing
+                diag.Set("TraceIdentifier", ctx.TraceIdentifier);
+                diag.Set("TraceId", Activity.Current?.TraceId.ToString());
+                diag.Set("SpanId", Activity.Current?.SpanId.ToString());
+
+                // Request basics
+                diag.Set("Scheme", ctx.Request.Scheme);
+                diag.Set("Host", ctx.Request.Host.Value);
+                diag.Set("QueryString", ctx.Request.QueryString.Value);
+
+                // User context (header is enforced by middleware for most endpoints)
+                var userId = ctx.Request.Headers["X-User-Id"].ToString();
+                if (!string.IsNullOrWhiteSpace(userId))
+                {
+                    diag.Set("UserId", userId);
+                }
+
+                // CORS / client hints
+                diag.Set("Origin", ctx.Request.Headers.Origin.ToString());
+                diag.Set("Referer", ctx.Request.Headers.Referer.ToString());
+                diag.Set("UserAgent", ctx.Request.Headers.UserAgent.ToString());
+
+                // Network
+                diag.Set("RemoteIp", ctx.Connection.RemoteIpAddress?.ToString());
+
+                // Payload metadata (never log bodies)
+                diag.Set("RequestContentType", ctx.Request.ContentType);
+                diag.Set("RequestContentLength", ctx.Request.ContentLength);
+            };
         });
         return app;
     }
