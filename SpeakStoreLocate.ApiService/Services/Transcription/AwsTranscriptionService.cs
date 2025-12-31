@@ -27,7 +27,7 @@ public class AwsTranscriptionService : ITranscriptionService
     {
         try
         {
-            _logger.LogInformation("Starting AWS Transcribe service - Implementation pending");
+            _logger.LogWarning("AWS Transcribe service requested but not implemented. Falling back is required.");
             
             // TODO: Implement AWS Transcribe functionality
             // This would involve:

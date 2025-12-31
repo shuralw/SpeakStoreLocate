@@ -4,6 +4,8 @@ using Microsoft.CodeAnalysis;
 using SpeakStoreLocate.ApiService.Models;
 using SpeakStoreLocate.ApiService.Utils;
 using SpeakStoreLocate.ApiService.Middleware;
+using System.Diagnostics;
+using SpeakStoreLocate.ApiService.Utilities;
 
 namespace SpeakStoreLocate.ApiService.Services.Storage;
 
@@ -25,22 +27,32 @@ public class AwsStorageRepository : IStorageRepository
 
     public async Task<IEnumerable<StorageItem>> GetStorageItems()
     {
+        var sw = Stopwatch.StartNew();
         var conditions = new List<ScanCondition>
         {
             new ScanCondition("UserId", ScanOperator.Equal, _userContext.UserId)
         };
         var results = await _dbContext.ScanAsync<StorageItem>(conditions).GetRemainingAsync();
 
+        _logger.LogDebug("GetStorageItems completed. Count={Count} ElapsedMs={ElapsedMs}", results.Count, sw.ElapsedMilliseconds);
+
         return results;
     }
 
     public async Task<List<string>> PerformActions(List<StorageCommand> commands)
     {
+        var sw = Stopwatch.StartNew();
+        _logger.LogInformation("PerformActions started. CommandCount={CommandCount}", commands?.Count ?? 0);
         List<string> performedActions = new List<string>();
 
         // 7) Befehle speichern
         foreach (var cmd in commands)
         {
+            _logger.LogDebug("Processing command. Method={Method} ItemNameLength={ItemNameLength} DestinationLength={DestinationLength}",
+                cmd.Method.ToString(),
+                LoggingSanitizer.SafeLength(cmd.ItemName),
+                LoggingSanitizer.SafeLength(cmd.Destination));
+
             if (cmd.Method == METHODS.ENTNAHME)
             {
                 if (string.IsNullOrEmpty(cmd.Destination))
@@ -121,12 +133,16 @@ public class AwsStorageRepository : IStorageRepository
             }
         }
 
-        _logger.LogDebug("Anzahl an Ergebnissen: {performedActions}", performedActions.Count().ToString());
+        _logger.LogInformation("PerformActions completed. ActionCount={ActionCount} ElapsedMs={ElapsedMs}",
+            performedActions.Count,
+            sw.ElapsedMilliseconds);
+        _logger.LogDebug("Performed action count (debug). ActionCount={ActionCount}", performedActions.Count);
         return performedActions;
     }
 
     public async Task<IEnumerable<string>> GetStorageLocations()
     {
+        var sw = Stopwatch.StartNew();
         var storageItems = await _dbContext
             .ScanAsync<StorageItem>(new List<ScanCondition>
             {
@@ -139,6 +155,11 @@ public class AwsStorageRepository : IStorageRepository
             .Where(location => !string.IsNullOrEmpty(location))
             .Distinct()
             .ToList();
+
+        _logger.LogDebug("GetStorageLocations completed. DistinctCount={DistinctCount} TotalItems={TotalItems} ElapsedMs={ElapsedMs}",
+            distinctLocations.Count,
+            storageItems.Count,
+            sw.ElapsedMilliseconds);
         
         return distinctLocations;
     }
@@ -182,10 +203,12 @@ public class AwsStorageRepository : IStorageRepository
 
     private async Task<StorageItem> FindStorageItemByName(StorageCommand cmd)
     {
+        var sw = Stopwatch.StartNew();
         var normalizedQuery = cmd.ItemName.NormalizeForSearch();
-        _logger.LogDebug("itemname: {itemname}", cmd.ItemName);
-        _logger.LogDebug("itemname: {itemname}", cmd.Destination);
-        _logger.LogDebug("normalizedQuery: {normalizedQuery}", normalizedQuery);
+        _logger.LogDebug("FindStorageItemByName started. ItemNameLength={ItemNameLength} NormalizedQueryLength={NormalizedQueryLength}",
+            LoggingSanitizer.SafeLength(cmd.ItemName),
+            LoggingSanitizer.SafeLength(normalizedQuery));
+
         var conditions = new List<ScanCondition>
         {
             new ScanCondition("UserId", ScanOperator.Equal, _userContext.UserId),
@@ -195,7 +218,25 @@ public class AwsStorageRepository : IStorageRepository
         IEnumerable<StorageItem> results =
             await _dbContext.ScanAsync<StorageItem>(conditions).GetRemainingAsync();
 
-        var storageItem = results.Single();
-        return storageItem;
+        var list = results as IList<StorageItem> ?? results.ToList();
+        _logger.LogDebug("FindStorageItemByName query completed. MatchCount={MatchCount} ElapsedMs={ElapsedMs}",
+            list.Count,
+            sw.ElapsedMilliseconds);
+
+        if (list.Count == 1)
+        {
+            return list[0];
+        }
+
+        if (list.Count == 0)
+        {
+            _logger.LogWarning("No storage item match found. NormalizedQuery={NormalizedQuery}", normalizedQuery);
+            throw new InvalidOperationException("No storage item match found.");
+        }
+
+        _logger.LogWarning("Multiple storage item matches found. NormalizedQuery={NormalizedQuery} MatchCount={MatchCount}",
+            normalizedQuery,
+            list.Count);
+        throw new InvalidOperationException("Multiple storage item matches found.");
     }
 }

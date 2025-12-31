@@ -5,6 +5,8 @@ using Deepgram.Models.Listen.v1.REST;
 using Microsoft.Extensions.Options;
 using SpeakStoreLocate.ApiService.Models;
 using SpeakStoreLocate.ApiService.Options;
+using System.Diagnostics;
+using SpeakStoreLocate.ApiService.Utilities;
 
 namespace SpeakStoreLocate.ApiService.Services.Transcription;
 
@@ -31,12 +33,18 @@ public class DeepgramTranscriptionService : ITranscriptionService
     {
         try
         {
+            var sw = Stopwatch.StartNew();
             byte[] audioBytes;
             using (var ms = new MemoryStream())
             {
                 await request.AudioFile.CopyToAsync(ms);
                 audioBytes = ms.ToArray();
             }
+
+            _logger.LogDebug("Deepgram local transcription started. ContentType={ContentType} FileName={FileName} AudioBytes={AudioBytes}",
+                request.AudioFile?.ContentType,
+                request.AudioFile?.FileName,
+                audioBytes.Length);
 
             var response = await _deepgramClient.TranscribeFile(
                 audioBytes,
@@ -46,8 +54,11 @@ public class DeepgramTranscriptionService : ITranscriptionService
                     SmartFormat = true,
                 });
 
-            _logger.LogInformation("Deepgram transcription completed for local processing");
-            return response?.Results?.Channels?.FirstOrDefault()?.Alternatives?.FirstOrDefault()?.Transcript ?? string.Empty;
+            var transcript = response?.Results?.Channels?.FirstOrDefault()?.Alternatives?.FirstOrDefault()?.Transcript ?? string.Empty;
+            _logger.LogInformation("Deepgram local transcription finished. TranscriptLength={TranscriptLength} ElapsedMs={ElapsedMs}",
+                LoggingSanitizer.SafeLength(transcript),
+                sw.ElapsedMilliseconds);
+            return transcript;
         }
         catch (Exception ex)
         {
@@ -60,12 +71,18 @@ public class DeepgramTranscriptionService : ITranscriptionService
     {
         try
         {
+            var sw = Stopwatch.StartNew();
             byte[] audioBytes;
             using (var ms = new MemoryStream())
             {
                 await request.AudioFile.CopyToAsync(ms);
                 audioBytes = ms.ToArray();
             }
+
+            _logger.LogDebug("Deepgram transcription started. ContentType={ContentType} FileName={FileName} AudioBytes={AudioBytes}",
+                request.AudioFile?.ContentType,
+                request.AudioFile?.FileName,
+                audioBytes.Length);
 
             var response = await _deepgramClient.TranscribeFile(
                 audioBytes,
@@ -91,7 +108,9 @@ public class DeepgramTranscriptionService : ITranscriptionService
             // 2. Alle Kanal-Transkripte zu einem Gesamtstring verbinden
             string transcriptText = string.Join(" ", bestTranscriptionPerChannel);
 
-            _logger.LogInformation("Deepgram transcription completed successfully");
+            _logger.LogInformation("Deepgram transcription finished. TranscriptLength={TranscriptLength} ElapsedMs={ElapsedMs}",
+                LoggingSanitizer.SafeLength(transcriptText),
+                sw.ElapsedMilliseconds);
             return transcriptText;
         }
         catch (Exception ex)
