@@ -229,6 +229,14 @@ export class AudioRecorderComponent implements OnInit {
 
   private async uploadAudio(upload: PendingUpload, isRetry = false): Promise<void> {
 
+    // TEMP WORKAROUND (STT evaluation): save recording locally instead of calling the backend.
+    // You can move the saved file into `SpeakStoreLocate.Tests/Assets/` and add a matching `.txt` reference transcript.
+    const LOCAL_SAVE_INSTEAD_OF_BACKEND = true;
+    if (LOCAL_SAVE_INSTEAD_OF_BACKEND) {
+      await this.saveUploadLocally(upload);
+      return;
+    }
+
     const form = new FormData();
     form.append('audioFile', upload.blob, 'recording.webm');
 
@@ -301,6 +309,74 @@ export class AudioRecorderComponent implements OnInit {
       } else {
         this.showResult(false, 'Fehler beim Upload!');
       }
+    }
+  }
+
+  private async saveUploadLocally(upload: PendingUpload): Promise<void> {
+    const suggestedName = this.makeSuggestedFileName(upload);
+
+    this.zone.run(() => {
+      upload.isUploading = true;
+    });
+
+    try {
+      await this.saveBlobToFileSystem(upload.blob, suggestedName);
+
+      this.zone.run(() => {
+        upload.isUploading = false;
+        upload.archived = true;
+        upload.uploadedAt = Date.now();
+        upload.backendResults = [`local-file:${suggestedName}`];
+      });
+
+      this.showResult(true, `Audio lokal gespeichert: ${suggestedName}`);
+    } catch (err) {
+      console.error('[AudioRecorderComponent] Local save failed:', err);
+      this.zone.run(() => {
+        upload.isUploading = false;
+      });
+      this.showResult(false, 'Lokales Speichern fehlgeschlagen!');
+    }
+  }
+
+  private makeSuggestedFileName(upload: PendingUpload): string {
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const dur = Math.round(upload.duration * 10) / 10;
+    return `case-${ts}-${dur}s.webm`;
+  }
+
+  private async saveBlobToFileSystem(blob: Blob, suggestedName: string): Promise<void> {
+    // Prefer File System Access API (Chromium). This lets you choose the repo folder directly.
+    const anyWindow = window as any;
+    if (typeof anyWindow.showSaveFilePicker === 'function') {
+      const handle = await anyWindow.showSaveFilePicker({
+        suggestedName,
+        types: [
+          {
+            description: 'WebM Audio',
+            accept: { 'audio/webm': ['.webm'] }
+          }
+        ]
+      });
+
+      const writable = await handle.createWritable();
+      await writable.write(await blob.arrayBuffer());
+      await writable.close();
+      return;
+    }
+
+    // Fallback: trigger a download.
+    const url = URL.createObjectURL(blob);
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = suggestedName;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } finally {
+      URL.revokeObjectURL(url);
     }
   }
 
