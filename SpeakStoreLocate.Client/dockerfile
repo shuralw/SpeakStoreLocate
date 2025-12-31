@@ -24,8 +24,12 @@ RUN rm /etc/nginx/conf.d/default.conf
 # Copy custom nginx config
 COPY SpeakStoreLocate.Client/nginx.conf /etc/nginx/conf.d/nginx.conf
 
+# Remove default nginx static content (includes the "Welcome to nginx!" index.html)
+RUN rm -rf /usr/share/nginx/html/*
+
 # Copy built app from builder
-COPY --from=builder /app/dist/speak-store-locate-client /usr/share/nginx/html
+# Angular (@angular/build:application) outputs browser assets into dist/.../browser
+COPY --from=builder /app/dist/speak-store-locate-client/browser/ /usr/share/nginx/html/
 
 # Copy entrypoint script
 COPY SpeakStoreLocate.Client/entrypoint.sh /entrypoint.sh
