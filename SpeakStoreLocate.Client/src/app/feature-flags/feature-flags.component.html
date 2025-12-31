@@ -1,0 +1,32 @@
+<div class="feature-flags-container">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>flag</mat-icon>
+        Feature Flags
+      </mat-card-title>
+      <mat-card-subtitle>Hidden route (nur wenn man die URL kennt)</mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <div class="flag-row">
+        <div class="flag-text">
+          <div class="name">Audio: lokal speichern statt Backend</div>
+          <div class="desc">
+            Speichert die Aufnahme als Datei (für STT-Testassets) und ruft das Backend nicht auf.
+          </div>
+        </div>
+
+        <mat-slide-toggle
+          [checked]="flags.localSaveInsteadOfBackend"
+          (change)="onLocalSaveChanged($event.checked)">
+          {{ flags.localSaveInsteadOfBackend ? 'AN' : 'AUS' }}
+        </mat-slide-toggle>
+      </div>
+
+      <div class="hint">
+        Route: <code>/__flags</code>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

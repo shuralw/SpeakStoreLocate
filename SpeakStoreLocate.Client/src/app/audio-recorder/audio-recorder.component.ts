@@ -7,6 +7,7 @@ import { isUserIdHeaderError } from '../utils/http-error.utils';
 import { MatTableDataSource } from '@angular/material/table';
 import { MatSort } from '@angular/material/sort';
 import { FormControl } from '@angular/forms';
+import { FeatureFlagsService } from '../services/feature-flags.service';
 
 export interface PeriodicElement {
   id: string;
@@ -73,7 +74,7 @@ export class AudioRecorderComponent implements OnInit {
   private editingOriginalName: string = '';
   private editingOriginalLocation: string = '';
 
-  constructor(private http: HttpClient, private zone: NgZone) { }
+  constructor(private http: HttpClient, private zone: NgZone, private flags: FeatureFlagsService) { }
 
   async ngOnInit() {
     // Restore filter visibility preference
@@ -81,6 +82,7 @@ export class AudioRecorderComponent implements OnInit {
       const persisted = localStorage.getItem('audioRecorder.showFilters');
       this.showFilters = persisted === 'true';
     } catch {}
+
     void this.loadCachedUploadsAsync();
     void this.loadTableAsync();
   }
@@ -229,10 +231,9 @@ export class AudioRecorderComponent implements OnInit {
 
   private async uploadAudio(upload: PendingUpload, isRetry = false): Promise<void> {
 
-    // TEMP WORKAROUND (STT evaluation): save recording locally instead of calling the backend.
-    // You can move the saved file into `SpeakStoreLocate.Tests/Assets/` and add a matching `.txt` reference transcript.
-    const LOCAL_SAVE_INSTEAD_OF_BACKEND = true;
-    if (LOCAL_SAVE_INSTEAD_OF_BACKEND) {
+    // Feature flag: save recording locally instead of calling the backend.
+    // Useful to collect STT test assets.
+    if (this.flags.localSaveInsteadOfBackend) {
       await this.saveUploadLocally(upload);
       return;
     }
