@@ -8,6 +8,7 @@ using SpeakStoreLocate.ApiService.Options;
 using System.Diagnostics;
 using System.Text.Json;
 using SpeakStoreLocate.ApiService.Utilities;
+using System.Globalization;
 
 namespace SpeakStoreLocate.ApiService.Services.Transcription;
 
@@ -45,6 +46,8 @@ public class DeepgramTranscriptionService : ITranscriptionService
                 audioBytes = ms.ToArray();
             }
 
+            audioBytes = await TryNormalizeAudioAsync(audioBytes, request.AudioFile?.ContentType, request.AudioFile?.FileName);
+
             _logger.LogDebug("Deepgram local transcription started. ContentType={ContentType} FileName={FileName} AudioBytes={AudioBytes}",
                 request.AudioFile?.ContentType,
                 request.AudioFile?.FileName,
@@ -56,6 +59,7 @@ public class DeepgramTranscriptionService : ITranscriptionService
                 {
                     Model = "nova-2",
                     SmartFormat = true,
+                    Language = "de",
                 });
 
             var debugPayloadEnabled = _loggingOptions.DebugPayload.Enabled;
@@ -101,6 +105,8 @@ public class DeepgramTranscriptionService : ITranscriptionService
                 audioBytes = ms.ToArray();
             }
 
+            audioBytes = await TryNormalizeAudioAsync(audioBytes, request.AudioFile?.ContentType, request.AudioFile?.FileName);
+
             _logger.LogDebug("Deepgram transcription started. ContentType={ContentType} FileName={FileName} AudioBytes={AudioBytes}",
                 request.AudioFile?.ContentType,
                 request.AudioFile?.FileName,
@@ -112,7 +118,7 @@ public class DeepgramTranscriptionService : ITranscriptionService
                 {
                     Model = "nova-3-general",
                     Punctuate = true,
-                    Language = "multi",
+                    Language = "de",
                     SmartFormat = true,
                 });
 
@@ -134,16 +140,24 @@ public class DeepgramTranscriptionService : ITranscriptionService
                 }
             }
 
-            // 1. Für jeden Kanal die beste Alternative herausholen
-            var bestTranscriptionPerChannel = response
-                .Results
-                .Channels
-                .Select(channel =>
-                    channel.Alternatives
-                        .OrderByDescending(alt => alt.Confidence)
-                        .First()
-                        .Transcript
-                );
+            // 1. Für jeden Kanal die beste Alternative herausholen (null-safe)
+            var channels = response?.Results?.Channels;
+            if (channels == null || channels.Count == 0)
+            {
+                _logger.LogWarning("Deepgram response contained no channels.");
+                return string.Empty;
+            }
+
+            var bestTranscriptionPerChannel = channels
+                .Select(channel => channel?.Alternatives)
+                .Where(alternatives => alternatives != null && alternatives.Count > 0)
+                .Select(alternatives =>
+                    alternatives!
+                        .OrderByDescending(alt => alt?.Confidence ?? 0)
+                        .FirstOrDefault()
+                        ?.Transcript)
+                .Where(t => !string.IsNullOrWhiteSpace(t))
+                .Select(t => t!.Trim());
 
             // 2. Alle Kanal-Transkripte zu einem Gesamtstring verbinden
             string transcriptText = string.Join(" ", bestTranscriptionPerChannel);
@@ -158,5 +172,64 @@ public class DeepgramTranscriptionService : ITranscriptionService
             _logger.LogError(ex, "Error during audio transcription");
             throw;
         }
+    }
+
+    private async Task<byte[]> TryNormalizeAudioAsync(byte[] audioBytes, string? contentType, string? fileName)
+    {
+        try
+        {
+            if (audioBytes.Length == 0)
+            {
+                return audioBytes;
+            }
+
+            // If it's already WAV, avoid unnecessary work.
+            if (IsWav(contentType, fileName))
+            {
+                return audioBytes;
+            }
+
+            var sw = Stopwatch.StartNew();
+            var normalized = await FfmpegAudioTranscoder.TranscodeToWavPcm16kMonoAsync(audioBytes);
+
+            _logger.LogDebug(
+                "Audio normalized via ffmpeg. OriginalBytes={OriginalBytes} NormalizedBytes={NormalizedBytes} ContentType={ContentType} FileName={FileName} ElapsedMs={ElapsedMs}",
+                audioBytes.Length,
+                normalized.Length,
+                contentType ?? "(null)",
+                fileName ?? "(null)",
+                sw.ElapsedMilliseconds);
+
+            return normalized;
+        }
+        catch (Exception ex)
+        {
+            // Robustness-first: if normalization fails in some environment, keep transcription working.
+            _logger.LogWarning(ex,
+                "Audio normalization failed; sending original audio to Deepgram. ContentType={ContentType} FileName={FileName} AudioBytes={AudioBytes}",
+                contentType ?? "(null)",
+                fileName ?? "(null)",
+                audioBytes.Length);
+            return audioBytes;
+        }
+    }
+
+    private static bool IsWav(string? contentType, string? fileName)
+    {
+        if (!string.IsNullOrWhiteSpace(contentType))
+        {
+            var ct = contentType.Trim().ToLower(CultureInfo.InvariantCulture);
+            if (ct is "audio/wav" or "audio/x-wav" or "audio/wave" or "audio/vnd.wave")
+            {
+                return true;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(fileName))
+        {
+            return fileName.EndsWith(".wav", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return false;
     }
 }
