@@ -25,6 +25,7 @@ export interface PendingUpload {
   archived?: boolean;
   uploadedAt?: number;
   backendResults?: string[];
+  isSnapshot?: boolean; // Flag für Snapshot-Uploads (verhindert erneute Archivierung)
 }
 
 @Component({
@@ -247,30 +248,49 @@ export class AudioRecorderComponent implements OnInit {
       upload.isUploading = true;
     });
 
+    // Logging für Snapshot-Uploads
+    if (upload.isSnapshot) {
+      console.info('[AudioRecorderComponent] Snapshot-Upload gestartet für Upload-ID:', upload.id);
+    }
+
     try {
       const results = await firstValueFrom(
         this.http.post<string[]>(`${this.API_BASE}/upload-audio`, form)
       );
 
+      // Logging für erfolgreichen Snapshot-Upload
+      if (upload.isSnapshot) {
+        console.info('[AudioRecorderComponent] Snapshot-Upload erfolgreich abgeschlossen. Archivierung wird übersprungen.');
+      }
+
       // Upload erfolgreich - als archiviert markieren (nicht mehr pending)
+      // ABER: Bei Snapshot-Uploads KEINE Archivierung durchführen
       this.zone.run(() => {
         const index = this.pendingUploads.findIndex(p => p.id === upload.id);
         if (index >= 0) {
           this.pendingUploads[index].isUploading = false;
-          this.pendingUploads[index].archived = true;
-          this.pendingUploads[index].uploadedAt = Date.now();
-          this.pendingUploads[index].backendResults = results;
+          
+          // Nur bei normalen Uploads (nicht bei Snapshots) archivieren
+          if (!upload.isSnapshot) {
+            this.pendingUploads[index].archived = true;
+            this.pendingUploads[index].uploadedAt = Date.now();
+            this.pendingUploads[index].backendResults = results;
+          }
         }
       });
 
       // Erfolgsmeldungen anzeigen
       for (const res of results) {
-        this.showResult(true, `Erfolgreich gespeichert: ${res}`);
+        const message = upload.isSnapshot 
+          ? `Snapshot erfolgreich hochgeladen: ${res}` 
+          : `Erfolgreich gespeichert: ${res}`;
+        this.showResult(true, message);
         await new Promise(resolve => setTimeout(resolve, 5500));
       }
 
       // Falls es sich um einen gecachten Eintrag handelt: als archiviert markieren (nicht löschen)
-      if (upload.id.startsWith('cache-')) {
+      // ABER: Bei Snapshot-Uploads KEINE Änderung am Cache vornehmen
+      if (!upload.isSnapshot && upload.id.startsWith('cache-')) {
         const numericId = parseInt(upload.id.replace('cache-', ''), 10);
         if (!Number.isNaN(numericId)) {
           try {
@@ -501,33 +521,22 @@ export class AudioRecorderComponent implements OnInit {
       return;
     }
 
-    // First mark everything as pending again (UI + cache), then kick off uploads without awaiting.
-    for (const upload of archived) {
-      upload.archived = false;
-      upload.uploadedAt = undefined;
-      upload.backendResults = undefined;
-      upload.isUploading = false;
+    console.info('[AudioRecorderComponent] Starte Snapshot-Upload für archivierte Uploads. Anzahl:', archived.length);
 
-      if (upload.id.startsWith('cache-')) {
-        const numericId = parseInt(upload.id.replace('cache-', ''), 10);
-        if (!Number.isNaN(numericId)) {
-          try {
-            await AudioCache.markPending(numericId);
-          } catch (err) {
-            console.error('[AudioRecorderComponent] Failed to mark cached upload pending:', err);
-          }
-        }
-      }
-    }
-
-    // Start uploads in the background (otherwise each upload blocks on the success popup delays).
+    // Archivierte Uploads bleiben im archivierten Zustand.
+    // Stattdessen setzen wir das isSnapshot-Flag, um beim Upload die Archivierung zu überspringen.
+    // Dies verhindert die Endlosschleife: Snapshot-Upload erfolgt OHNE Änderung am Cache/Status.
     for (const upload of archived) {
+      // Snapshot-Flag setzen
+      upload.isSnapshot = true;
+      
+      // Upload im Hintergrund starten (ohne await, damit Popup-Delays nicht blockieren)
       void this.uploadAudio(upload, true).catch((err) => {
-        console.error('[AudioRecorderComponent] Requeue upload failed:', err);
+        console.error('[AudioRecorderComponent] Snapshot-Upload fehlgeschlagen:', err);
       });
     }
 
-    this.showResult(true, `Archivierte Uploads in Queue: ${archived.length}`);
+    this.showResult(true, `Snapshot-Upload gestartet für ${archived.length} archivierte(s) Upload(s)`);
   }
 
   async clearArchivedUploads(): Promise<void> {
