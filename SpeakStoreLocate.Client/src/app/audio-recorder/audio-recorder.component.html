@@ -194,6 +194,22 @@
 
   <!-- Archived uploads counter (page end) -->
   <div style="margin-top: 10px; opacity: 0.8; font-size: 12px; text-align: center;">
-    Archivierte Uploads: {{ archivedUploadsCount }}
+      <div class="archive-footer" *ngIf="(flags.showArchivedUploadsUi$ | async)">
+        <div>Archivierte Uploads: {{ archivedUploadsCount }}</div>
+
+        <div class="archive-actions" *ngIf="archivedUploadsCount > 0">
+          <button mat-stroked-button color="warn" (click)="clearArchivedUploads()">
+            Alle archivierten Uploads löschen
+          </button>
+
+          <button mat-stroked-button (click)="requeueArchivedUploads()" *ngIf="(flags.enableArchivedRequeue$ | async)">
+            Archivierte Uploads in die Queue holen
+          </button>
+
+          <button mat-stroked-button (click)="downloadArchivedUploads()" *ngIf="(flags.enableArchivedDownloads$ | async)">
+            Archivierte Uploads herunterladen
+          </button>
+        </div>
+      </div>
   </div>
 </div>

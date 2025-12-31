@@ -148,6 +148,42 @@ export class AudioCache {
     }
   }
 
+  /** Mark a cached entry as pending again (used for re-queueing archived uploads). */
+  static async markPending(id: number): Promise<void> {
+    const db = await this.open();
+    try {
+      const tx = db.transaction(this.storeName, 'readwrite');
+      const store = tx.objectStore(this.storeName);
+
+      const existing = await new Promise<any>((resolve, reject) => {
+        const req = store.get(id);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+
+      if (!existing) {
+        console.warn('[AudioCache.markPending] Entry not found:', id);
+        return;
+      }
+
+      const updated = {
+        ...existing,
+        status: 'pending',
+        uploadedAt: undefined,
+        backendResults: undefined,
+      };
+
+      await new Promise<void>((resolve, reject) => {
+        const req = store.put(updated);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+      console.info('[AudioCache.markPending] Marked pending entry:', id);
+    } finally {
+      db.close();
+    }
+  }
+
   // Remove a cached entry by its primary key id
   static async remove(id: number): Promise<void> {
     const db = await this.open();
