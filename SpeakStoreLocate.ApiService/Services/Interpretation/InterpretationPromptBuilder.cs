@@ -1,5 +1,7 @@
 namespace SpeakStoreLocate.ApiService.Services.Interpretation;
 
+using SpeakStoreLocate.ApiService.Utilities;
+
 public class InterpretationPromptBuilder(IInterpretationPromptParts parts, ILogger<InterpretationPromptBuilder>? logger)
     : IInterpretationPromptBuilder
 {
@@ -7,9 +9,12 @@ public class InterpretationPromptBuilder(IInterpretationPromptParts parts, ILogg
     {
         var system = parts.GetSystemPrompt();
         var locations = parts.GetLocationsInformationForImprovedLocationDetermination(existingLocations);
-        
-        logger?.LogDebug("System: {System}", system);
-        logger?.LogDebug("Locations: {Locations}", locations);
+
+        logger?.LogDebug(
+            "Prompt parts built. SystemLength={SystemLength} LocationsInfoLength={LocationsInfoLength} TranscriptLength={TranscriptLength}",
+            LoggingSanitizer.SafeLength(system),
+            LoggingSanitizer.SafeLength(locations),
+            LoggingSanitizer.SafeLength(transcriptedText));
         
         return $"{system}\n\n{locations}\n\nTranskript (de-DE):\n\n{transcriptedText}";
     }

@@ -3,6 +3,8 @@ using System.Text.Json;
 using Microsoft.Extensions.Options;
 using SpeakStoreLocate.ApiService.Models;
 using SpeakStoreLocate.ApiService.Options;
+using System.Diagnostics;
+using SpeakStoreLocate.ApiService.Utilities;
 
 namespace SpeakStoreLocate.ApiService.Services.Transcription;
 
@@ -30,10 +32,16 @@ public class ElevenlabsTranscriptionService : ITranscriptionService
     {
         try
         {
+            var sw = Stopwatch.StartNew();
             // 1) Datei in MemoryStream laden
             using var ms = new MemoryStream();
             await request.AudioFile.CopyToAsync(ms);
             ms.Position = 0;
+
+            _logger.LogDebug("ElevenLabs transcription started. ContentType={ContentType} FileName={FileName} FileLength={FileLength}",
+                request.AudioFile?.ContentType,
+                request.AudioFile?.FileName,
+                request.AudioFile?.Length);
 
             // 2) Multipart/FormData-Content aufbauen
             using var content = new MultipartFormDataContent();
@@ -54,17 +62,22 @@ public class ElevenlabsTranscriptionService : ITranscriptionService
             var body = await response.Content.ReadAsStringAsync();
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogError("ElevenLabs Scribe API Fehler {StatusCode}: {Body}",
-                    response.StatusCode, body);
-                throw new Exception($"Transkription fehlgeschlagen ({response.StatusCode}): {body}");
+                _logger.LogError("ElevenLabs Scribe API request failed. StatusCode={StatusCode} BodyLength={BodyLength}",
+                    response.StatusCode,
+                    body?.Length ?? 0);
+                _logger.LogDebug("ElevenLabs error body prefix: {BodyPrefix}", LoggingSanitizer.Truncate(body, 500));
+                throw new Exception($"Transkription fehlgeschlagen ({response.StatusCode}).");
             }
 
             // 5) JSON parsen und reines Text-Feld zurückgeben
             var result = JsonSerializer.Deserialize<ScribeResponse>(body,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             
-            _logger.LogInformation("ElevenLabs transcription completed successfully");
-            return result?.Text ?? string.Empty;
+            var transcript = result?.Text ?? string.Empty;
+            _logger.LogInformation("ElevenLabs transcription finished. TranscriptLength={TranscriptLength} ElapsedMs={ElapsedMs}",
+                LoggingSanitizer.SafeLength(transcript),
+                sw.ElapsedMilliseconds);
+            return transcript;
         }
         catch (Exception ex)
         {
