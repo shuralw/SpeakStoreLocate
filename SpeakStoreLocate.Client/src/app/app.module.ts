@@ -23,10 +23,13 @@ import { MatChipsModule } from '@angular/material/chips';
 import { UserIdBarComponent } from './components/user-id-bar/user-id-bar.component';
 import { UserIdInterceptor } from './interceptors/user-id.interceptor';
 import { HttpErrorInterceptor } from './interceptors/http-error.interceptor';
+import { FeatureFlagsComponent } from './feature-flags/feature-flags.component';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 
 @NgModule({ declarations: [
         AppComponent,
         AudioRecorderComponent,
+    FeatureFlagsComponent,
         UserIdBarComponent
     ],
     bootstrap: [AppComponent], imports: [BrowserModule,
@@ -39,6 +42,7 @@ import { HttpErrorInterceptor } from './interceptors/http-error.interceptor';
         MatProgressBarModule,
         MatProgressSpinnerModule,
         MatTooltipModule,
+    MatSlideToggleModule,
         BrowserAnimationsModule,
         MatFormFieldModule,
         MatInputModule,
