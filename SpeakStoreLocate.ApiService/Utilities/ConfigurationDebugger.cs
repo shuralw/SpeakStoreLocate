@@ -9,38 +9,38 @@ public static class ConfigurationDebugger
     {
         try
         {
-            logger.LogInformation("=== AWS Configuration Debug ===");
+            logger.LogDebug("=== AWS Configuration Debug ===");
             
             // S3 Configuration
             var s3Options = serviceProvider.GetService<IOptions<AmazonS3Options>>()?.Value;
             if (s3Options != null)
             {
-                logger.LogInformation("S3 Configuration:");
-                logger.LogInformation("  AccessKey: {AccessKey}", MaskCredential(s3Options.AccessKey));
-                logger.LogInformation("  SecretKey: {SecretKey}", MaskCredential(s3Options.SecretKey));
-                logger.LogInformation("  Region: {Region}", s3Options.Region);
-                logger.LogInformation("  BucketName: {BucketName}", s3Options.BucketName);
+                logger.LogDebug("S3 Configuration:");
+                logger.LogDebug("  AccessKey: {AccessKey}", MaskCredential(s3Options.AccessKey));
+                logger.LogDebug("  SecretKey: {SecretKey}", MaskCredential(s3Options.SecretKey));
+                logger.LogDebug("  Region: {Region}", s3Options.Region);
+                logger.LogDebug("  BucketName: {BucketName}", s3Options.BucketName);
             }
             
             // DynamoDB Configuration
             var dynamoOptions = serviceProvider.GetService<IOptions<AmazonDynamoDBOptions>>()?.Value;
             if (dynamoOptions != null)
             {
-                logger.LogInformation("DynamoDB Configuration:");
-                logger.LogInformation("  AccessKey: {AccessKey}", MaskCredential(dynamoOptions.AccessKey));
-                logger.LogInformation("  SecretKey: {SecretKey}", MaskCredential(dynamoOptions.SecretKey));
-                logger.LogInformation("  Region: {Region}", dynamoOptions.Region);
-                logger.LogInformation("  TableName: {TableName}", dynamoOptions.TableName);
+                logger.LogDebug("DynamoDB Configuration:");
+                logger.LogDebug("  AccessKey: {AccessKey}", MaskCredential(dynamoOptions.AccessKey));
+                logger.LogDebug("  SecretKey: {SecretKey}", MaskCredential(dynamoOptions.SecretKey));
+                logger.LogDebug("  Region: {Region}", dynamoOptions.Region);
+                logger.LogDebug("  TableName: {TableName}", dynamoOptions.TableName);
             }
             
             // Environment Variables Check
-            logger.LogInformation("Environment Variables:");
-            logger.LogInformation("  AWS_S3_ACCESS_KEY: {Value}", MaskCredential(Environment.GetEnvironmentVariable("AWS_S3_ACCESS_KEY")));
-            logger.LogInformation("  AWS_S3_SECRET_KEY: {Value}", MaskCredential(Environment.GetEnvironmentVariable("AWS_S3_SECRET_KEY")));
-            logger.LogInformation("  AWS_DYNAMODB_ACCESS_KEY: {Value}", MaskCredential(Environment.GetEnvironmentVariable("AWS_DYNAMODB_ACCESS_KEY")));
-            logger.LogInformation("  AWS_DYNAMODB_SECRET_KEY: {Value}", MaskCredential(Environment.GetEnvironmentVariable("AWS_DYNAMODB_SECRET_KEY")));
+            logger.LogDebug("Environment Variables:");
+            logger.LogDebug("  AWS_S3_ACCESS_KEY: {Value}", MaskCredential(Environment.GetEnvironmentVariable("AWS_S3_ACCESS_KEY")));
+            logger.LogDebug("  AWS_S3_SECRET_KEY: {Value}", MaskCredential(Environment.GetEnvironmentVariable("AWS_S3_SECRET_KEY")));
+            logger.LogDebug("  AWS_DYNAMODB_ACCESS_KEY: {Value}", MaskCredential(Environment.GetEnvironmentVariable("AWS_DYNAMODB_ACCESS_KEY")));
+            logger.LogDebug("  AWS_DYNAMODB_SECRET_KEY: {Value}", MaskCredential(Environment.GetEnvironmentVariable("AWS_DYNAMODB_SECRET_KEY")));
             
-            logger.LogInformation("=== End AWS Configuration Debug ===");
+            logger.LogDebug("=== End AWS Configuration Debug ===");
         }
         catch (Exception ex)
         {
@@ -52,29 +52,29 @@ public static class ConfigurationDebugger
     {
         try
         {
-            logger.LogInformation("=== OpenAI Configuration Debug ===");
+            logger.LogDebug("=== OpenAI Configuration Debug ===");
             
             var openAIOptions = serviceProvider.GetService<IOptions<OpenAIOptions>>()?.Value;
             if (openAIOptions != null)
             {
-                logger.LogInformation("OpenAI Configuration:");
-                logger.LogInformation("  ApiKey: {ApiKey}", MaskCredential(openAIOptions.APIKEY));
-                logger.LogInformation("  BaseUrl: {BaseUrl}", openAIOptions.BaseUrl);
-                logger.LogInformation("  DefaultModel: {DefaultModel}", openAIOptions.DefaultModel);
-                logger.LogInformation("  Temperature: {Temperature}", openAIOptions.Temperature);
+                logger.LogDebug("OpenAI Configuration:");
+                logger.LogDebug("  ApiKey: {ApiKey}", MaskCredential(openAIOptions.APIKEY));
+                logger.LogDebug("  BaseUrl: {BaseUrl}", openAIOptions.BaseUrl);
+                logger.LogDebug("  DefaultModel: {DefaultModel}", openAIOptions.DefaultModel);
+                logger.LogDebug("  Temperature: {Temperature}", openAIOptions.Temperature);
                 
                 // Validate BaseUrl
                 if (Uri.TryCreate(openAIOptions.BaseUrl, UriKind.Absolute, out var uri))
                 {
-                    logger.LogInformation("  BaseUrl is valid: {IsValid}", true);
+                    logger.LogDebug("  BaseUrl is valid: {IsValid}", true);
                 }
                 else
                 {
-                    logger.LogError("  BaseUrl is INVALID: {BaseUrl}", openAIOptions.BaseUrl);
+                    logger.LogWarning("  BaseUrl is INVALID: {BaseUrl}", openAIOptions.BaseUrl);
                 }
             }
             
-            logger.LogInformation("=== End OpenAI Configuration Debug ===");
+            logger.LogDebug("=== End OpenAI Configuration Debug ===");
         }
         catch (Exception ex)
         {
