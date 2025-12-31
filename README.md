@@ -10,6 +10,7 @@ SpeakStoreLocate ist eine .NET-Anwendung für Speech-Transkription und Storage-M
 - Angular Frontend
 - Docker Containerisierung
 - Produktion: AWS App Runner
+- Frontend (Production): AWS Amplify Hosting (Static Hosting via S3/CloudFront)
 - PR Preview-Umgebungen: Azure Container Apps (API + Client)
 
 ## Projektstruktur
@@ -83,6 +84,21 @@ Jeder Pull Request erhält automatisch eine isolierte Preview-Umgebung in Azure 
 Produktions-Deployments zu AWS App Runner werden automatisch bei Push auf den `master` Branch ausgelöst.
 
 Siehe [.github/workflows/deploy.yml](.github/workflows/deploy.yml).
+
+### Produktion (Frontend via AWS Amplify)
+
+Das Angular Frontend wird **nicht** über GitHub Actions deployed, sondern über **AWS Amplify Console (Repo-connected Hosting)**.
+
+- Typischer Ablauf: Push auf `master` → Amplify startet Build/Deploy der Branch → Assets landen in S3/CloudFront (Domain `*.amplifyapp.com`).
+- Die relevanten Einstellungen (Branch, Build spec, Rewrites/Redirects) liegen in der Amplify Console und waren deshalb bisher kaum im Repo sichtbar.
+
+Damit das Setup reproduzierbar ist, liegt die Buildspec jetzt im Repo:
+
+- [amplify.yml](amplify.yml)
+	- `appRoot: SpeakStoreLocate.Client`
+	- `artifacts.baseDirectory: dist/speak-store-locate-client/browser` (Angular 21 baut `index.html` in den `browser/`-Ordner)
+
+Hinweis: Für SPA-Routing (Deep Links) braucht Amplify üblicherweise zusätzlich eine Rewrite-Regel in der Console (alle Pfade → `/index.html` mit 200). Root-404 wie bei einem fehlenden `index.html` ist aber typischerweise ein Artifact-Pfad-Thema.
 
 ### Preview (Azure Container Apps)
 
