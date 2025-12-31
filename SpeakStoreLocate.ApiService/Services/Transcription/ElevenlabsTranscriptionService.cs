@@ -13,14 +13,17 @@ public class ElevenlabsTranscriptionService : ITranscriptionService
     private readonly ILogger<ElevenlabsTranscriptionService> _logger;
     private readonly HttpClient _elevenlabsHttpClient;
     private readonly ElevenLabsOptions _options;
+    private readonly LoggingOptions _loggingOptions;
 
     public ElevenlabsTranscriptionService(
         IOptions<ElevenLabsOptions> options,
         ILogger<ElevenlabsTranscriptionService> logger,
-        IHttpClientFactory httpClientFactory)
+        IHttpClientFactory httpClientFactory,
+        IOptions<LoggingOptions> loggingOptions)
     {
         _logger = logger;
         _options = options.Value;
+        _loggingOptions = loggingOptions.Value;
         
         _elevenlabsHttpClient = httpClientFactory.CreateClient("ElevenLabs");
         _elevenlabsHttpClient.BaseAddress = new Uri(_options.BaseUrl ?? "https://api.elevenlabs.io");
@@ -73,10 +76,21 @@ public class ElevenlabsTranscriptionService : ITranscriptionService
             var result = JsonSerializer.Deserialize<ScribeResponse>(body,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-            if (_logger.IsEnabled(LogLevel.Debug))
+            var debugPayloadEnabled = _loggingOptions.DebugPayload.Enabled;
+            var maxPayloadLength = _loggingOptions.DebugPayload.MaxLength;
+            if (debugPayloadEnabled || _logger.IsEnabled(LogLevel.Debug))
             {
-                // Debug-only: full vendor response JSON (may include additional metadata)
-                _logger.LogDebug("ElevenLabs response JSON (debug). Response={Response}", body);
+                var truncated = LoggingSanitizer.Truncate(body, maxPayloadLength);
+                var suffix = body != null && body.Length > maxPayloadLength ? "…(truncated)" : string.Empty;
+
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug("ElevenLabs response JSON (payload). Response={Response}{Suffix}", truncated, suffix);
+                }
+                else
+                {
+                    _logger.LogInformation("ElevenLabs response JSON (payload). Response={Response}{Suffix}", truncated, suffix);
+                }
             }
             
             var transcript = result?.Text ?? string.Empty;

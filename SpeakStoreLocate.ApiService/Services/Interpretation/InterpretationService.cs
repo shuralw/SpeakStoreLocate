@@ -1,13 +1,19 @@
 using System.Text;
 using System.Text.Json;
 using System.Diagnostics;
+using Microsoft.Extensions.Options;
 using SpeakStoreLocate.ApiService.Models;
+using SpeakStoreLocate.ApiService.Options;
 using SpeakStoreLocate.ApiService.Services.ChatCompletion;
 using SpeakStoreLocate.ApiService.Utilities;
 
 namespace SpeakStoreLocate.ApiService.Services.Interpretation;
 
-class InterpretationService(ILogger<InterpretationService> _logger, IChatCompletionService _chatCompletionService, IInterpretationPromptBuilder _promptBuilder)
+class InterpretationService(
+    ILogger<InterpretationService> _logger,
+    IChatCompletionService _chatCompletionService,
+    IInterpretationPromptBuilder _promptBuilder,
+    IOptions<LoggingOptions> _loggingOptions)
     : IInterpretationService
 {
     public async Task<List<StorageCommand>> InterpretGeschwafelToStructuredCommands(string transcriptedText,
@@ -29,12 +35,21 @@ class InterpretationService(ILogger<InterpretationService> _logger, IChatComplet
             LoggingSanitizer.SafeLength(chatResponse),
             sw.ElapsedMilliseconds);
 
-        if (_logger.IsEnabled(LogLevel.Debug))
+        var debugPayloadEnabled = _loggingOptions.Value.DebugPayload.Enabled;
+        var maxPayloadLength = _loggingOptions.Value.DebugPayload.MaxLength;
+        if (debugPayloadEnabled || _logger.IsEnabled(LogLevel.Debug))
         {
-            const int maxDebugChatResponseLength = 20000;
-            var truncated = LoggingSanitizer.Truncate(chatResponse, maxDebugChatResponseLength);
-            var suffix = chatResponse != null && chatResponse.Length > maxDebugChatResponseLength ? "…(truncated)" : string.Empty;
-            _logger.LogDebug("Chat response JSON (debug). ChatResponse={ChatResponse}{Suffix}", truncated, suffix);
+            var truncated = LoggingSanitizer.Truncate(chatResponse, maxPayloadLength);
+            var suffix = chatResponse != null && chatResponse.Length > maxPayloadLength ? "…(truncated)" : string.Empty;
+
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug("Chat response JSON (payload). ChatResponse={ChatResponse}{Suffix}", truncated, suffix);
+            }
+            else
+            {
+                _logger.LogInformation("Chat response JSON (payload). ChatResponse={ChatResponse}{Suffix}", truncated, suffix);
+            }
         }
 
         try
@@ -46,7 +61,7 @@ class InterpretationService(ILogger<InterpretationService> _logger, IChatComplet
 
             _logger.LogInformation("Interpretation parsed. CommandCount={CommandCount}", commands.Count);
 
-            if (_logger.IsEnabled(LogLevel.Debug))
+            if (debugPayloadEnabled || _logger.IsEnabled(LogLevel.Debug))
             {
                 var commandJson = JsonSerializer.Serialize(commands, new JsonSerializerOptions
                 {
@@ -54,10 +69,17 @@ class InterpretationService(ILogger<InterpretationService> _logger, IChatComplet
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase
                 });
 
-                const int maxDebugCommandsLength = 20000;
-                var truncated = LoggingSanitizer.Truncate(commandJson, maxDebugCommandsLength);
-                var suffix = commandJson.Length > maxDebugCommandsLength ? "…(truncated)" : string.Empty;
-                _logger.LogDebug("Parsed commands JSON (debug). CommandsJson={CommandsJson}{Suffix}", truncated, suffix);
+                var truncated = LoggingSanitizer.Truncate(commandJson, maxPayloadLength);
+                var suffix = commandJson.Length > maxPayloadLength ? "…(truncated)" : string.Empty;
+
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug("Parsed commands JSON (payload). CommandsJson={CommandsJson}{Suffix}", truncated, suffix);
+                }
+                else
+                {
+                    _logger.LogInformation("Parsed commands JSON (payload). CommandsJson={CommandsJson}{Suffix}", truncated, suffix);
+                }
             }
             return commands;
         }
