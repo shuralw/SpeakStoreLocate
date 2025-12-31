@@ -8,6 +8,7 @@ import { MatTableDataSource } from '@angular/material/table';
 import { MatSort } from '@angular/material/sort';
 import { FormControl } from '@angular/forms';
 import { FeatureFlagsService } from '../services/feature-flags.service';
+import JSZip from 'jszip';
 
 export interface PeriodicElement {
   id: string;
@@ -476,19 +477,21 @@ export class AudioRecorderComponent implements OnInit {
       return;
     }
 
-    // Best-effort: triggers one save/download per file.
-    for (const upload of archived) {
-      const name = this.makeSuggestedFileNameForExistingUpload(upload);
-      try {
-        await this.saveBlobToFileSystem(upload.blob, name);
-      } catch (err) {
-        console.error('[AudioRecorderComponent] Failed to download archived upload:', err);
-        this.showResult(false, 'Download abgebrochen/fehlgeschlagen.');
-        return;
+    try {
+      const zip = new JSZip();
+      for (const upload of archived) {
+        const name = this.makeSuggestedFileNameForExistingUpload(upload);
+        zip.file(name, await upload.blob.arrayBuffer());
       }
-    }
 
-    this.showResult(true, `Archivierte Uploads heruntergeladen: ${archived.length}`);
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      await this.saveBlobToFileSystem(zipBlob, `archived-uploads-${ts}.zip`);
+      this.showResult(true, `Archivierte Uploads als ZIP heruntergeladen: ${archived.length}`);
+    } catch (err) {
+      console.error('[AudioRecorderComponent] Failed to create ZIP download:', err);
+      this.showResult(false, 'ZIP-Download fehlgeschlagen.');
+    }
   }
 
   async requeueArchivedUploads(): Promise<void> {
@@ -498,6 +501,7 @@ export class AudioRecorderComponent implements OnInit {
       return;
     }
 
+    // First mark everything as pending again (UI + cache), then kick off uploads without awaiting.
     for (const upload of archived) {
       upload.archived = false;
       upload.uploadedAt = undefined;
@@ -514,13 +518,13 @@ export class AudioRecorderComponent implements OnInit {
           }
         }
       }
+    }
 
-      // Start upload again (will re-archive after success, as in the normal flow).
-      try {
-        await this.uploadAudio(upload, true);
-      } catch (err) {
+    // Start uploads in the background (otherwise each upload blocks on the success popup delays).
+    for (const upload of archived) {
+      void this.uploadAudio(upload, true).catch((err) => {
         console.error('[AudioRecorderComponent] Requeue upload failed:', err);
-      }
+      });
     }
 
     this.showResult(true, `Archivierte Uploads in Queue: ${archived.length}`);
