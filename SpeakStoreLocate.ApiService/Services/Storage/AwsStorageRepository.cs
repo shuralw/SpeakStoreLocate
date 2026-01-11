@@ -120,7 +120,8 @@ public class AwsStorageRepository : IStorageRepository
                     Location = cmd.Destination,
                     NormalizedName = cmd.ItemName.NormalizeForSearch(),
                     NormalizedLocation = cmd.Destination.NormalizeForSearch(),
-                    UserId = _userContext.UserId
+                    UserId = _userContext.UserId,
+                    Count = cmd.Count > 0 ? cmd.Count : 1
                 };
 
                 await _dbContext.SaveAsync(storageItem);
