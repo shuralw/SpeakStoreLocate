@@ -14,6 +14,7 @@ export interface PeriodicElement {
   id: string;
   location: string;
   name: string;
+  count?: number;
 }
 
 export interface PendingUpload {
@@ -579,6 +580,13 @@ export class AudioRecorderComponent implements OnInit {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }
 
+  formatName(element: PeriodicElement): string {
+    if (element.count && element.count > 1) {
+      return `${element.name} (${element.count}x)`;
+    }
+    return element.name;
+  }
+
   private showResult(success: boolean, message: string) {
     this.zone.run(() => {
       this.isSuccess = success;
@@ -593,11 +601,12 @@ export class AudioRecorderComponent implements OnInit {
       const raw = await firstValueFrom(
         this.http.get<any[]>(`${this.API_BASE}`)
       );
-      // Map API (Id/Name/Location) to client model (id/name/location)
+      // Map API (Id/Name/Location/Count) to client model (id/name/location/count)
       return (raw ?? []).map(x => ({
         id: x.id ?? x.Id,
         name: x.name ?? x.Name,
         location: x.location ?? x.Location,
+        count: x.count ?? x.Count,
       } as PeriodicElement));
     } catch {
       this.showResult(false, 'Tabelle konnte nicht geladen werden.');
