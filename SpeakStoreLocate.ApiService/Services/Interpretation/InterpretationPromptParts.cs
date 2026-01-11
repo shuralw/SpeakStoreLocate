@@ -13,8 +13,8 @@ public class InterpretationPromptParts : IInterpretationPromptParts
             Erzeuge **striktes** JSON (keine Freitext‑Antwort!), und zwar ein Array von Objekten mit genau diesen vier Feldern:
 
             • method        – eine der Zeichenketten ""GET"", ""DELETE"", ""POST"" oder ""PUT""  
-            • count         – eine Ganzzahl (1,2,3…)  
-            • itemName      – der exakte Artikelname (inkl. Groß‑/Kleinschreibung wie im Transkript)  
+            • count         – eine Ganzzahl (1,2,3…); setze auf die im Transkript genannte Anzahl, oder 1 wenn keine Anzahl genannt wird  
+            • itemName      – der Artikelname; wenn im Transkript eine Anzahl genannt wird, formatiere als ""<count>x <itemName>"" (z.B. ""3x Schraube""); wenn keine Anzahl genannt wird, verwende nur den Artikelnamen ohne Mengenpräfix  
             • source        – die Quelllokation (optional, nur bei PUT mandatory) 
             • destination   – die Ziellokation (optional - bleibt leer bei GET)  
 
@@ -32,6 +32,7 @@ public class InterpretationPromptParts : IInterpretationPromptParts
                 - Füge bei PUT‑Befehlen das Feld `""source""` hinzu, um die Quell‑Lokation zu speichern.  
                 - Gib immer `""count"": 1`, wenn keine Zahl genannt wird.  
                 - Ersetze ausgeschriebene Zahlen („drei“) durch Ziffern (3).  
+                - Wenn im Transkript eine Anzahl genannt wird, füge diese als Präfix zum `""itemName""` hinzu (Format: ""<count>x <itemName>""); wenn keine Anzahl genannt wird, verwende den Artikelnamen ohne Mengenpräfix.  
                 - Normalisiere Leer‑ und Sonderzeichen (Trim, keine führenden/trailenden Leerzeichen).  
                 - Wenn ein Satz kein valides Kommando enthält, ignoriere ihn schlicht.  
                 - Bei Suchen soll der Itemname gesetzt werden, der Ort wird allerdings nicht identifiziert und bleibt leer.
@@ -57,6 +58,16 @@ public class InterpretationPromptParts : IInterpretationPromptParts
                         ""itemName"": ""Lampe"",
                         ""source"":   ""Regal A"",
                         ""destination"": ""Regal B""
+                    }
+                ]
+            Und für
+                >„Lege drei Schrauben in Regal A.“
+                [
+                    {
+                        ""method"":   ""POST"",
+                        ""count"":    3,
+                        ""itemName"": ""3x Schraube"",
+                        ""destination"": ""Regal A""
                     }
                 ]";
 
