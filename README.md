@@ -100,6 +100,13 @@ Damit das Setup reproduzierbar ist, liegt die Buildspec jetzt im Repo:
 
 Hinweis: Für SPA-Routing (Deep Links) braucht Amplify üblicherweise zusätzlich eine Rewrite-Regel in der Console (alle Pfade → `/index.html` mit 200). Root-404 wie bei einem fehlenden `index.html` ist aber typischerweise ein Artifact-Pfad-Thema.
 
+### Produktion (Hetzner via Docker Compose)
+
+Neue CI/CD-Pipeline für GHCR + Hetzner (PR-Validierung, Push-Deploy, manueller Deploy):
+
+- Workflow: [.github/workflows/hetzner-cicd.yml](.github/workflows/hetzner-cicd.yml)
+- Doku: [docs/HETZNER_CICD.md](docs/HETZNER_CICD.md)
+
 ### Preview (Azure Container Apps)
 
 Siehe [.github/workflows/pr-preview.yml](.github/workflows/pr-preview.yml).

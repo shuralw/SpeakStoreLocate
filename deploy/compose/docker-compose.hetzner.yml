@@ -1,0 +1,32 @@
+name: speakstorelocate
+
+services:
+  api:
+    image: ghcr.io/${GHCR_OWNER}/speakstorelocate-api:${API_IMAGE_TAG:-latest}
+    container_name: speakstorelocate-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+    networks:
+      - speakstorelocate-net
+
+  client:
+    image: ghcr.io/${GHCR_OWNER}/speakstorelocate-client:${CLIENT_IMAGE_TAG:-latest}
+    container_name: speakstorelocate-client
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      API_BASE: ${API_BASE}
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    networks:
+      - speakstorelocate-net
+
+networks:
+  speakstorelocate-net:
+    name: speakstorelocate-net
