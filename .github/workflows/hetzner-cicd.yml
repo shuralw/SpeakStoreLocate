@@ -1,0 +1,314 @@
+name: CI/CD Hetzner (API + Client)
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      deploy_api:
+        description: "API build/push/deploy ausführen"
+        required: true
+        default: true
+        type: boolean
+      deploy_client:
+        description: "Client build/push/deploy ausführen"
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: hetzner-cicd-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      api: ${{ steps.filter.outputs.api }}
+      client: ${{ steps.filter.outputs.client }}
+      deploy_api: ${{ steps.compute.outputs.deploy_api }}
+      deploy_client: ${{ steps.compute.outputs.deploy_client }}
+      anything_to_deploy: ${{ steps.compute.outputs.anything_to_deploy }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Filter paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'SpeakStoreLocate.ApiService/**'
+              - 'SpeakStoreLocate.AppHost/**'
+              - 'SpeakStoreLocate.ServiceDefaults/**'
+              - 'SpeakStoreLocate.Tests/**'
+              - 'SpeakStoreLocate.sln'
+              - 'global.json'
+            frontend:
+              - 'SpeakStoreLocate.Client/**'
+            api:
+              - 'SpeakStoreLocate.ApiService/**'
+              - 'SpeakStoreLocate.ServiceDefaults/**'
+              - 'SpeakStoreLocate.AppHost/**'
+              - 'SpeakStoreLocate.ApiService/dockerfile'
+              - 'SpeakStoreLocate.sln'
+              - 'global.json'
+            client:
+              - 'SpeakStoreLocate.Client/**'
+
+      - name: Compute deploy flags
+        id: compute
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DEPLOY_API="false"
+          DEPLOY_CLIENT="false"
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ "${{ inputs.deploy_api }}" == "true" ]]; then DEPLOY_API="true"; fi
+            if [[ "${{ inputs.deploy_client }}" == "true" ]]; then DEPLOY_CLIENT="true"; fi
+          else
+            if [[ "${{ steps.filter.outputs.api }}" == "true" ]]; then DEPLOY_API="true"; fi
+            if [[ "${{ steps.filter.outputs.client }}" == "true" ]]; then DEPLOY_CLIENT="true"; fi
+          fi
+
+          ANYTHING="false"
+          if [[ "$DEPLOY_API" == "true" || "$DEPLOY_CLIENT" == "true" ]]; then
+            ANYTHING="true"
+          fi
+
+          echo "deploy_api=$DEPLOY_API" >> "$GITHUB_OUTPUT"
+          echo "deploy_client=$DEPLOY_CLIENT" >> "$GITHUB_OUTPUT"
+          echo "anything_to_deploy=$ANYTHING" >> "$GITHUB_OUTPUT"
+
+  backend-build-test:
+    name: Backend Build/Test
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore SpeakStoreLocate.sln
+
+      - name: Build
+        run: dotnet build SpeakStoreLocate.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test SpeakStoreLocate.Tests/SpeakStoreLocate.Tests.csproj --configuration Release --no-build --verbosity normal
+
+  frontend-build-test:
+    name: Frontend Build/Test
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.12'
+          cache: npm
+          cache-dependency-path: SpeakStoreLocate.Client/package-lock.json
+
+      - name: Install
+        working-directory: SpeakStoreLocate.Client
+        run: npm ci
+
+      - name: Build
+        working-directory: SpeakStoreLocate.Client
+        run: npm run build -- --configuration development
+
+      - name: Test
+        working-directory: SpeakStoreLocate.Client
+        run: npm test -- --watch=false --browsers=ChromeHeadless
+
+  build-push-api:
+    name: Build/Push API image
+    runs-on: ubuntu-latest
+    needs:
+      - changes
+      - backend-build-test
+    if: |
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      needs.changes.outputs.deploy_api == 'true'
+    outputs:
+      image_repo: ${{ steps.meta.outputs.image_repo }}
+      image_tag_sha: ${{ steps.meta.outputs.tag_sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve image metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          OWNER_LC="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          IMAGE_REPO="ghcr.io/${OWNER_LC}/speakstorelocate-api"
+          TAG_SHA="sha-${GITHUB_SHA}"
+          echo "owner_lc=$OWNER_LC" >> "$GITHUB_OUTPUT"
+          echo "image_repo=$IMAGE_REPO" >> "$GITHUB_OUTPUT"
+          echo "tag_sha=$TAG_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: SpeakStoreLocate.ApiService/dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image_repo }}:latest
+            ${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.tag_sha }}
+          cache-from: type=gha,scope=api-image
+          cache-to: type=gha,mode=max,scope=api-image
+
+  build-push-client:
+    name: Build/Push Client image
+    runs-on: ubuntu-latest
+    needs:
+      - changes
+      - frontend-build-test
+    if: |
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      needs.changes.outputs.deploy_client == 'true'
+    outputs:
+      image_repo: ${{ steps.meta.outputs.image_repo }}
+      image_tag_sha: ${{ steps.meta.outputs.tag_sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve image metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          OWNER_LC="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          IMAGE_REPO="ghcr.io/${OWNER_LC}/speakstorelocate-client"
+          TAG_SHA="sha-${GITHUB_SHA}"
+          echo "owner_lc=$OWNER_LC" >> "$GITHUB_OUTPUT"
+          echo "image_repo=$IMAGE_REPO" >> "$GITHUB_OUTPUT"
+          echo "tag_sha=$TAG_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Client image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: SpeakStoreLocate.Client/dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image_repo }}:latest
+            ${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.tag_sha }}
+          cache-from: type=gha,scope=client-image
+          cache-to: type=gha,mode=max,scope=client-image
+
+  deploy-hetzner:
+    name: Deploy to Hetzner (SSH + docker compose)
+    runs-on: ubuntu-latest
+    needs:
+      - changes
+      - build-push-api
+      - build-push-client
+    if: |
+      always() &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      needs.changes.outputs.anything_to_deploy == 'true' &&
+      (needs.build-push-api.result == 'success' || needs.build-push-api.result == 'skipped') &&
+      (needs.build-push-client.result == 'success' || needs.build-push-client.result == 'skipped')
+    steps:
+      - name: Start ssh-agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Add known_hosts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HETZNER_SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy via SSH
+        env:
+          HETZNER_SSH_HOST: ${{ secrets.HETZNER_SSH_HOST }}
+          HETZNER_SSH_PORT: ${{ secrets.HETZNER_SSH_PORT }}
+          HETZNER_SSH_USER: ${{ secrets.HETZNER_SSH_USER }}
+          HETZNER_DEPLOY_PATH: ${{ secrets.HETZNER_DEPLOY_PATH }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          DEPLOY_API: ${{ needs.changes.outputs.deploy_api }}
+          DEPLOY_CLIENT: ${{ needs.changes.outputs.deploy_client }}
+          API_TAG: sha-${{ github.sha }}
+          CLIENT_TAG: sha-${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SSH_PORT="${HETZNER_SSH_PORT:-22}"
+
+          ssh -p "$SSH_PORT" "$HETZNER_SSH_USER@$HETZNER_SSH_HOST" \
+            "GHCR_USERNAME='$GHCR_USERNAME' GHCR_TOKEN='$GHCR_TOKEN' HETZNER_DEPLOY_PATH='$HETZNER_DEPLOY_PATH' DEPLOY_API='$DEPLOY_API' DEPLOY_CLIENT='$DEPLOY_CLIENT' API_TAG='$API_TAG' CLIENT_TAG='$CLIENT_TAG' bash -s" <<'EOF'
+          set -euo pipefail
+
+          cd "$HETZNER_DEPLOY_PATH/compose"
+
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+
+          if [[ "$DEPLOY_API" == "true" ]]; then
+            API_IMAGE_TAG="$API_TAG" docker compose --env-file .env -f docker-compose.hetzner.yml pull api
+            API_IMAGE_TAG="$API_TAG" docker compose --env-file .env -f docker-compose.hetzner.yml up -d api
+          fi
+
+          if [[ "$DEPLOY_CLIENT" == "true" ]]; then
+            CLIENT_IMAGE_TAG="$CLIENT_TAG" docker compose --env-file .env -f docker-compose.hetzner.yml pull client
+            CLIENT_IMAGE_TAG="$CLIENT_TAG" docker compose --env-file .env -f docker-compose.hetzner.yml up -d client
+          fi
+
+          docker image prune -f
+          EOF
