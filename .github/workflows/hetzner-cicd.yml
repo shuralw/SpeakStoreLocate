@@ -298,17 +298,17 @@ jobs:
 
           cd "$HETZNER_DEPLOY_PATH/compose"
 
-          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+          echo "$GHCR_TOKEN" | sudo -n docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
           if [[ "$DEPLOY_API" == "true" ]]; then
-            API_IMAGE_TAG="$API_TAG" docker compose --env-file .env -f docker-compose.hetzner.yml pull api
-            API_IMAGE_TAG="$API_TAG" docker compose --env-file .env -f docker-compose.hetzner.yml up -d api
+            API_IMAGE_TAG="$API_TAG" sudo -n docker compose --env-file .env -f docker-compose.hetzner.yml pull api
+            API_IMAGE_TAG="$API_TAG" sudo -n docker compose --env-file .env -f docker-compose.hetzner.yml up -d api
           fi
 
           if [[ "$DEPLOY_CLIENT" == "true" ]]; then
-            CLIENT_IMAGE_TAG="$CLIENT_TAG" docker compose --env-file .env -f docker-compose.hetzner.yml pull client
-            CLIENT_IMAGE_TAG="$CLIENT_TAG" docker compose --env-file .env -f docker-compose.hetzner.yml up -d client
+            CLIENT_IMAGE_TAG="$CLIENT_TAG" sudo -n docker compose --env-file .env -f docker-compose.hetzner.yml pull client
+            CLIENT_IMAGE_TAG="$CLIENT_TAG" sudo -n docker compose --env-file .env -f docker-compose.hetzner.yml up -d client
           fi
 
-          docker image prune -f
+          sudo -n docker image prune -f
           EOF
