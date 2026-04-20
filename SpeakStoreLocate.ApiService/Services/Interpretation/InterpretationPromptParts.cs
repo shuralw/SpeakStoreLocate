@@ -37,6 +37,7 @@ public class InterpretationPromptParts : IInterpretationPromptParts
                 - Bei Suchen soll der Itemname gesetzt werden, der Ort wird allerdings nicht identifiziert und bleibt leer.
                 - Falls du offensichtliche Rechtschreibfehler erkennst, die der Transkriptor erzeugt haben könnte, korrigiere diese. Das kommt aber relativ selten vor.
                 - Filler‑Wörter: Entferne Artikel (der, die, das) und Füllwörter, aber nur soweit, dass der eigentliche Artikelname klar bleibt.    
+                - **WICHTIG für Mengenangaben:** Die Anzahl muss sowohl im ""count"" Feld als auch im ""itemName"" hinterlegt werden. Wenn z.B. """"8 Schnapsgläser"""" gesagt wird, muss ""count"": 8 und ""itemName"": """"8 Schnapsgläser"""" gesetzt werden. Behalte dabei die Pluralform bei.
 
             **Beispiel-Ausgabe** für deinen Text:
                 >„Und das Fahrrad wird an der Wand aufgehangen.“
